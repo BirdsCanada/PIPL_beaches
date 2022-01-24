@@ -5,5 +5,92 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(tidyverse)
 ```
 
+To Do:
+
+save as csv
+Load and clean NC data sheet
+Figure out annotation style
+figure out file path style
+
+Note: I'm using relative paths as of right now, my file structure includes a folder with the project subdirectory and a Data folder within, my wd is the project subdirectory
+
+
+2017-2021 data was extracted from Nature counts and saved as csv, formatting is all the same
+
+ Notes on columns to follow-up on
+ loc_id What is this? is it a coordinates or correlates to a beach?
+```{r load 2017-2021}
+#goes back a level to enter Data folder and access csv
+all_na <- function(x) any(!is.na(x)) #function to remove columns that are all NA
+piplDataAll<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>% 
+  select_if(all_na)
+piplData<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>%
+  select(3,16:23,32,35,37:41,51:52,56,58:59,65,74,76:82,86:118) #selected columns we may want
+
+beachnames<-piplData %>% 
+  filter(statprov_code=="NS") %>% 
+  select(name) %>% 
+  unique() %$% 
+  name
+
+
+x<-piplData %>% 
+  filter(name %in% beachnames) 
+y<-piplData %>% 
+  filter(statprov_code == 'NS') 
+#checking if same number of obs.
+setdiff(x,y)  #one extra entry in x, use form_id to identify (unique identifier column)
+x<-NULL
+y<-NULL
+
+#fixing the mislabelled data point, form_id 101563 labelled as MB
+piplDataAll[piplDataAll$form_id == 101563, 'statprov_code']<-"NS"
+piplData[piplData$form_id == 101563, 'statprov_code']<-"NS"
+
+range(piplData$year) #includes observations from 1999-2005 exclude for now
+
+piplData<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>%
+  select(3,16:23,32,35,37:41,51:52,56,58:59,65,74,76:82,86:118) %>% 
+  filter(statprov_code == 'NS') %>% 
+  filter(year %in% 2017:2021)
+```
+
+
+```{r load 2012-2016 survey data}
+
+```
+
+
+
+```{r load productivity}
+brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
+brc2<-read.csv(file = '../Data/Productivity_2017-2021_LB_BM.csv')
+#fix minor issues with brc1
+brc1<-brc1 %>% 
+  na_if( y = "N/A") %>%  #change manually inputted N/A to NA values
+  mutate_at(vars(3:12), as.numeric) %>% #reassign column types to match for joining
+  select(1:5,8:11) #remove pairs monitored and site visits as brc2 doesn't have these variables
+
+#reformat brc2 to match brc1, remove or rename columns and fill blanks from excel sheet (beach listed once for 5 entries)
+brc2<-brc2 %>% 
+  select(1:6,11:12) %>% 
+  rename(BeachID = Beach.Name, YE_singles = Singles, YE_pairs = Pairs, Productivity = Yearly.Productivity, Nesting.attempts = n.ofNesting.Attempts, Nestloss_HD = Nestloss) %>% 
+  mutate(BeachID = na_if(x = BeachID, y = "")) %>% #change blanks into NA so the fill function can work
+  fill(BeachID) %>% #this works because the spreadsheet was ordered by beach name and then year already
+  mutate(County = NA)
+
+prodData<-rbind(brc1, brc2) %>% 
+  arrange(BeachID, Year)
+
+```
+Still need to fix
+
+remove asterisks
+change ampersands to and
+sync names (some have ',port joli' etc) to the official CWS ones
+fill counties correctly
+Not sure what to do about locations joined in some years but separate in others
