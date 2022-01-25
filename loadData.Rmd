@@ -12,74 +12,94 @@ library(tidyverse)
 Note: I'm using relative paths as of right now, my file structure includes a folder with the project subdirectory and a Data folder within, my wd is the project subdirectory
 Is this the path style I should keep using?
 
+To Do:
+get complete beach area, and parking lot area data
+
+
 
 Follow-Up Notes:
 -loc_id What is this? is it a coordinates or correlates to a beach?
 -Not sure what to do about locations joined in some years but separate in others
 -2012-2017 BRC I have all Northern NS survey data raw, but only sandwalkers and dog raw for southern (email someone if needed)
+-I have no idea what's going on with goose haven, goose (indian) point, and goose and burks point??
 
-Here I load in the 2017-2021 BRC data that was downloaded from Nature Counts and saved as a .csv
-```{r load 2017-2021}
+
+```{r load data}
+#Here I load in the 2017-2021 BRC data that was downloaded from Nature Counts and saved as a .csv
 all_na <- function(x) any(!is.na(x)) #function to remove columns that are all NA
 
 #path goes back a level to enter Data folder and access csv
-piplDataAll<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>% 
+piplSurveyAll<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>% 
   select_if(all_na) # removes empty columns
-piplData<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>%
-  select(3,16:23,32,35,37:41,51:52,56,58:59,65,74,76:82,86:118) #selected columns we may want data from
 
-beachnames<-piplData %>% 
+#Here I load and clean the productivity data from 2012-2021 surveys
+brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
+brc2<-read.csv(file = '../Data/Productivity_2017-2021_LB_BM.csv') 
+
+#physical data including beach length, area (to be added), and parking lot area (to be added)
+beachLength<-read.csv(file = '../Data/beachLength.csv') %>% 
+  rename(BeachID = 1, Length_km = 3)
+
+#Note on beach length excel sheet states those names are the standard and so I'll use them as the name list
+beachnames<-beachLength$BeachID
+
+#most complete beachnames list with correct spelling
+beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point", "Goose Haven", "Taylor Head Bay", "Chance Harbour", "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm")) #
+#James and Bowen Island are sometimes apart, the rest are not present in beachLength but are presumably spelled right
+
+```
+
+
+```{r clean 2017-2021 survey data}
+
+beaches<-piplSurveyAll %>% 
   filter(statprov_code=="NS") %>% 
   select(name) %>% 
   unique() %$% 
   name
 
-#fix typo in Crescent and daniels head
-beachnames[13]<-"Crescent (Shelburne Co.)"
-beachnames[9]<-"Daniels Head (Southside)"
-
-x<-piplData %>% 
-  filter(name %in% beachnames) 
-y<-piplData %>% 
+#checking to make sure the province codes are correct
+x<-piplSurveyAll %>% 
+  filter(name %in% beaches) #did this with beachnames first but had 300 less obs.
+y<-piplSurveyAll %>% 
   filter(statprov_code == 'NS') 
-#checking if same number of obs.
-setdiff(x,y)  #one extra entry in x, use form_id to identify (unique identifier column)
+
+setdiff(x,y)  #one extra entry in x, use unique id to find form_id 101563 labelled as MB but NS beach
 x<-NULL
 y<-NULL
+#beaches<-NULL
 
 #fixing the mislabelled data point, form_id 101563 labelled as MB
-piplDataAll[piplDataAll$form_id == 101563, 'statprov_code']<-"NS"
-piplData[piplData$form_id == 101563, 'statprov_code']<-"NS"
+piplSurveyAll[piplSurveyAll$form_id == 101563, 'statprov_code']<-"NS"
 
-range(piplData$year) #includes observations from 1999-2005 exclude for now
+range(piplSurveyAll$year) #includes observations from 1999-2005 exclude for now
 
-piplData<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>%
-  select(3,16:23,32,35,37:41,51:52,56,58:59,65,74,76:82,86:118) %>% 
+#create a smaller df with only NS beaches with columns I may want data from (survey and weather and ids etc)
+piplSurvey<-piplSurveyAll %>%
+  select(3,15,16:22,24,27:31,32,34:39,43:50,54:86) %>%
   filter(statprov_code == 'NS') %>% 
   filter(year %in% 2017:2021)
+
 ```
 
 Have all Northern NS survey data raw, but only sandwalkers and dog raw for southern
 Do I want raw data or are the summaries fine?
-```{r load 2012-2016 survey data}
+```{r clean 2012-2016 survey data}
 
 ```
 
 
 Here I load and clean the productivity data from 2012-2021 surveys
-```{r load productivity}
-brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
+```{r clean productivity data}
 
 #fix minor issues with brc1
 brc1<-brc1 %>% 
   na_if( y = "N/A") %>%  #change manually inputted N/A to NA values
   mutate_at(vars(3:12), as.numeric) %>% #reassign column types to match for joining
-  select(1:5,8:11) #remove pairs monitored and site visits as brc2 doesn't have these variables
+  select(1:5,8:11) #remove pairs monitored and site visits columns as brc2 doesn't have these variables
 
 
-brc2<-read.csv(file = '../Data/Productivity_2017-2021_LB_BM.csv')
-
-#reformat brc2 to match brc1, remove or rename columns and fill blanks from excel sheet (beach listed once for 5 entries)
+#reformat brc2 to match brc1, remove or rename columns and fill blanks from excel sheet (beach listed once for every 5 entries)
 brc2<-brc2 %>% 
   select(1:6,11:12) %>% 
   rename(BeachID = Beach.Name, YE_singles = Singles, YE_pairs = Pairs, Productivity = Yearly.Productivity, Nesting.attempts = n.ofNesting.Attempts, Nestloss_HD = Nestloss) %>% 
@@ -95,39 +115,45 @@ brc2$BeachID %<>%
 
 #fixing BeachID entries to match
 
-#determine which beaches in brc2 are different
-x<-setdiff(brc2$BeachID, brc1$BeachID)
-
-#these are not present in brc1 and so can remain the way they're spelled
-x<-x[! (x %in% c("Goose and Burks Point", "Dominion (Lingan) Beach", "James Beach and Bowen Island"))] 
-
-#using the list above I manually assigned the correct spelling from the complete list (beachnames)
-brc2$BeachID %<>% 
-  gsub("Cherry Hill", paste(beachnames[1]), .) %>% 
-  gsub("Cape LaHave Island", paste(beachnames[25]), .) %>% 
-  gsub("Carters and Wobamkek", paste(beachnames[2]), .) %>% 
-  gsub("Conrads", paste(beachnames[35]), .) %>% 
-  gsub("Crescent", paste(beachnames[13]), .) %>% 
-  gsub("Crows Neck", paste(beachnames[5]), .) %>% 
-  gsub("Daniels Head", paste(beachnames[9]), .) %>% 
-  gsub("Durham Lane",paste(beachnames[14]), .) %>% 
-  gsub("Goose Haven", paste(beachnames[54]), .) %>% 
-  gsub("Grahams Cove", paste(beachnames[27]), .) %>%
-  gsub("North East Point", paste(beachnames[11]), .) %>%
-  gsub("Pictou Split Bar (Lighthouse)", paste(beachnames[44]), .) %>%
-  gsub("Rainbow Haven", paste(beachnames[56]), .) %>%
-  gsub("Round Bay and Roseway", paste(beachnames[8]), .) %>%
-  gsub("Sandhills PP", paste(beachnames[15]), .) %>%
-  gsub("Shipping Point (Port Hood)", paste(beachnames[49]), .)
+#determine which beaches aren't in beachnames (added to the append command in 'load data' chunk)
+setdiff(brc2$BeachID, beachnames) #mostly spelling errors, a few places not named in beachnames
+setdiff(brc1$BeachID, beachnames) #this list has more beaches not named elsewhere
+                               
+      
+#using the lists above I manually assigned the correct spelling from the complete list (beachnames)
+brc1$BeachID %<>% 
+  gsub("Goose Haven, Port Joli", paste(beachnames[64]), .) %>% 
+  gsub("Grahams Cove / Ferry Road", paste(beachnames[24]), .) %>%
+  gsub("James Beach", paste(beachnames[61]), .) %>%
+  gsub("Ratcliffe Hills (The Cape)", paste(beachnames[58]), .) %>% #not working??
+  gsub("Durham Lane Beach, Port Joli", paste(beachnames[20]), .)
   
-summary(as.factor(brc2$BeachID)) #looks good
-x<-NULL
-#brc1<-NULL
-#brc2<-NULL
+brc2$BeachID %<>% 
+  gsub("Cherry Hill", paste(beachnames[9]), .) %>% 
+  gsub("Cape LaHave Island", paste(beachnames[6]), .) %>% 
+  gsub("Carters and Wobamkek", paste(beachnames[8]), .) %>%
+  gsub("Clam Harbour ", paste(beachnames[10]), .) %>% 
+  gsub("Conrads", paste(beachnames[12]), .) %>% 
+  gsub("Crescent", paste(beachnames[15]), .) %>% 
+  gsub("Crows Neck", paste(beachnames[16]), .) %>% 
+  gsub("Daniels Head", paste(beachnames[17]), .) %>% 
+  gsub("Dominion (Lingan) Beach", paste(beachnames[18]), .) %>%  #notworking
+  gsub("Durham Lane",paste(beachnames[20]), .) %>% 
+  gsub("Grahams Cove", paste(beachnames[24]), .) %>%
+  gsub("James Beach and Bowen Island", paste(beachnames[30]), .) %>%
+  gsub("North East Point", paste(beachnames[39]), .) %>%
+  gsub("Pictou Split Bar (Lighthouse)", paste(beachnames[42]), .) %>%  #notworking
+  gsub("Rainbow Haven", paste(beachnames[45]), .) %>%
+  gsub("Round Bay and Roseway", paste(beachnames[48]), .) %>%
+  gsub("Sandhills PP", paste(beachnames[49]), .) %>% #notworking
+  gsub("Shipping Point (Port Hood)", paste(beachnames[51]), .) %>%  #notworking
+  gsub("South Harbour ", paste(beachnames[52]), .)
+
+
 ```
 
 
-```{r join productivity}
+```{r create productivity df}
 prodData<-rbind(brc1, brc2) %>% 
   arrange(BeachID, Year) %>% 
   mutate(County = na_if(x = County, y = "")) %>%
@@ -155,4 +181,14 @@ prodData<-left_join(y, prodData, by = 'BeachID') %>%
 x<-NULL
 y<-NULL
 ```
+
+adding beach length (from BRC data) and area (google earth beach polygons)
+*will add parking lot size and number information when available*
+```{r physical beach data load}
+
+left_join(prodData, beachLength, by = 'BeachID')
+
+```
+
+
 
