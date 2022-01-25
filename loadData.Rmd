@@ -44,7 +44,7 @@ beachLength<-read.csv(file = '../Data/beachLength.csv') %>%
 beachnames<-beachLength$BeachID
 
 #most complete beachnames list with correct spelling
-beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point", "Goose Haven", "Taylor Head Bay", "Chance Harbour", "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm")) #
+beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point", "Goose Haven", "Taylor Head Bay", "Chance Harbour", "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm", "Ratcliffe Hills (The Cape)")) #
 #James and Bowen Island are sometimes apart, the rest are not present in beachLength but are presumably spelled right
 
 ```
@@ -107,28 +107,23 @@ brc2<-brc2 %>%
   fill(BeachID) %>% #this works because the spreadsheet was ordered by beach name and then year already
   mutate(County = NA)
 
-#remove small formatting differences, punctuation
-brc2$BeachID %<>%
-  gsub("\\*", "", .) %>% 
-  gsub("&", "and", .) %>% 
-  gsub("'", "", .)
-
 #fixing BeachID entries to match
 
 #determine which beaches aren't in beachnames (added to the append command in 'load data' chunk)
 setdiff(brc2$BeachID, beachnames) #mostly spelling errors, a few places not named in beachnames
 setdiff(brc1$BeachID, beachnames) #this list has more beaches not named elsewhere
                                
-      
 #using the lists above I manually assigned the correct spelling from the complete list (beachnames)
 brc1$BeachID %<>% 
   gsub("Goose Haven, Port Joli", paste(beachnames[64]), .) %>% 
   gsub("Grahams Cove / Ferry Road", paste(beachnames[24]), .) %>%
   gsub("James Beach", paste(beachnames[61]), .) %>%
-  gsub("Ratcliffe Hills (The Cape)", paste(beachnames[58]), .) %>% #not working??
   gsub("Durham Lane Beach, Port Joli", paste(beachnames[20]), .)
   
-brc2$BeachID %<>% 
+brc2$BeachID %<>%
+  gsub("\\*", "", .) %>%   
+  gsub("&", "and", .) %>% 
+  gsub("'", "", .) %>% #removes small formatting differences, punctuation mismatching
   gsub("Cherry Hill", paste(beachnames[9]), .) %>% 
   gsub("Cape LaHave Island", paste(beachnames[6]), .) %>% 
   gsub("Carters and Wobamkek", paste(beachnames[8]), .) %>%
@@ -137,19 +132,26 @@ brc2$BeachID %<>%
   gsub("Crescent", paste(beachnames[15]), .) %>% 
   gsub("Crows Neck", paste(beachnames[16]), .) %>% 
   gsub("Daniels Head", paste(beachnames[17]), .) %>% 
-  gsub("Dominion (Lingan) Beach", paste(beachnames[18]), .) %>%  #notworking
   gsub("Durham Lane",paste(beachnames[20]), .) %>% 
   gsub("Grahams Cove", paste(beachnames[24]), .) %>%
   gsub("James Beach and Bowen Island", paste(beachnames[30]), .) %>%
   gsub("North East Point", paste(beachnames[39]), .) %>%
-  gsub("Pictou Split Bar (Lighthouse)", paste(beachnames[42]), .) %>%  #notworking
   gsub("Rainbow Haven", paste(beachnames[45]), .) %>%
   gsub("Round Bay and Roseway", paste(beachnames[48]), .) %>%
-  gsub("Sandhills PP", paste(beachnames[49]), .) %>% #notworking
-  gsub("Shipping Point (Port Hood)", paste(beachnames[51]), .) %>%  #notworking
+  gsub("Sandhills PP ", paste(beachnames[49]), .) %>%
   gsub("South Harbour ", paste(beachnames[52]), .)
 
+#manually assigning names that aren't working with gsub
+#dominion rows 271-275
+brc2[271:275, 'BeachID']<-"Dominion (Lingan)"
+#pictou rows 241-245
+brc2[241:245, 'BeachID']<-"Pictou Bar Spit (Lighthouse)"
+# shipping rows 261-265
+brc2[261:265, 'BeachID']<-"Shipping Point"
 
+#final check should be 0, all beaches should have been added to beach names or the spelling fixed
+setdiff(brc2$BeachID, beachnames)
+setdiff(brc1$BeachID, beachnames)
 ```
 
 
@@ -185,9 +187,12 @@ y<-NULL
 adding beach length (from BRC data) and area (google earth beach polygons)
 *will add parking lot size and number information when available*
 ```{r physical beach data load}
+prodData<-left_join(prodData, beachLength, by = 'BeachID')
 
-left_join(prodData, beachLength, by = 'BeachID')
-
+prodData %>% 
+  group_by(BeachID) %>% 
+  summarize(nas = sum(is.na(Length_km))) %>% 
+  filter(nas > 0) #15 beaches in the productivity sheet without beach length calculated.
 ```
 
 
