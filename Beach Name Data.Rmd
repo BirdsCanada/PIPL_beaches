@@ -1,8 +1,11 @@
 ---
-title: "Beach Names and data"
-output: html_notebook
+title: "Beach Names"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 trying to subset the polygons to only work with NS beaches
 
@@ -10,6 +13,8 @@ Notes:
 There's a note in the beachLength excel sheet saying the beach names conform with fed recovery data and spatial data so use these names (however I found a typo in the two Keji sites - no space between Keji and NP which was fixed manually in csv I think)
 
 *No polygons/coastline present for:* 'Fox Bar', 'Harbour Breeze, Port Joli', 'Hirtles', 'Inverness Beach', 'Roaring Bull Point', 'White Point Beach', and 'Ogdens Pond'
+
+*ALSO no polygons/coastline:* 'Chance Harbour', 'Goose and Burks Point' (Unless this is 'Goose (Indian) Point'), and 'Taylor Head Bay'
 
 James & Bowen Island are grouped in BRC, but separate polygon sites.
 
