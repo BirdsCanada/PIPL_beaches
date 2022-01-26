@@ -21,7 +21,9 @@ Follow-Up Notes:
 -loc_id What is this? is it a coordinates or correlates to a beach?
 -Not sure what to do about locations joined in some years but separate in others
 -2012-2017 BRC I have all Northern NS survey data raw, but only sandwalkers and dog raw for southern (email someone if needed)
+<<<<<<< HEAD
 -I have no idea what's going on with goose (indian) point, and goose and burks point?? Are these the same site??? Goose (Indian) Point is half of Goose and Burks point
+
 
 These Beaches are mentioned in spreadsheets but will be excluded since they're not in the BRC or the GIS data and don't appear to be regularly monitored:
 "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm", "Ratcliffe Hills (The Cape)"
