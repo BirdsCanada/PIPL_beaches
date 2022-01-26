@@ -1,0 +1,43 @@
+---
+title: "Beach Names and data"
+output: html_notebook
+---
+
+
+trying to subset the polygons to only work with NS beaches
+
+Notes:
+There's a note in the beachLength excel sheet saying the beach names conform with fed recovery data and spatial data so use these names (however I found a typo in the two Keji sites - no space between Keji and NP which was fixed manually in csv I think)
+
+*No polygons/coastline present for:* 'Fox Bar', 'Harbour Breeze, Port Joli', 'Hirtles', 'Inverness Beach', 'Roaring Bull Point', 'White Point Beach', and 'Ogdens Pond'
+
+James & Bowen Island are grouped in BRC, but separate polygon sites.
+
+*Coastline measurement only missing:* 'Goose Haven' and 'Gull Island Beach'
+
+```{r}
+beaches<-read.csv(file = '../Data/beaches polygon.csv') #polygon file with just columns, selected beaches within NS provincial boundary in QGIS
+beaches$province<-NULL
+beachLength<-read.csv(file = '../Data/beachLength.csv') #beach length csv from BRC
+
+#creating a list of the correctly spelled beaches
+beachNames<-beachLength$Critical.Habitat.Site.Name..Note..these.names.conform.with.fed..Recovery.docs.and.spatial.data.
+
+#adding beaches in NS not in the beachLength doc but we have polygons for
+beachNames<-append(beachNames, c("James", "Bowen Island", "Goose Haven", "Gull Island Beach")) 
+beaches$province<-ifelse(beaches$Name %in% beachNames, "NS", "other")
+
+summary(as.factor(beaches$province)) #56/61 beaches listed in beachLength, 5 polygon beaches missing and additionally 2 beaches missing polygons and coastline measurements
+
+#double check we don't have polygons for these 5 beaches
+missing<-setdiff(beachLength$Critical.Habitat.Site.Name..Note..these.names.conform.with.fed..Recovery.docs.and.spatial.data., beaches$Name) # missing coastline length and polygons
+
+#this is all the beach polygons, not just the NS beaches to check I didn't accidentally exclude them
+atlbeaches<-read.csv(file = '../Data/atl beaches polygons.csv')
+atlbeaches %>% 
+  filter(atlbeaches$Name %in% missing) # none so the polygons are really missing and need to be added
+
+```
+I can go into data sheets and find the GPS coordinates to digitize the 7 missing beaches
+
+
