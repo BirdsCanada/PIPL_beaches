@@ -14,7 +14,7 @@ Is this the path style I should keep using?
 
 To Do:
 get complete beach area, and parking lot area data
-
+update management blanks
 
 
 Follow-Up Notes:
@@ -44,6 +44,11 @@ brc2<-read.csv(file = '../Data/Productivity_2017-2021_LB_BM.csv')
 #physical data including beach length, area (to be added), and parking lot area (to be added)
 beachLength<-read.csv(file = '../Data/beachLength.csv') %>% 
   rename(BeachID = 1, Length_km = 3)
+beachArea<-read.csv(file = '../Data/beaches polygon.csv') %>% 
+  rename(BeachID = 1 )
+extralengths<-read.csv(file = '../Data/supplementary coastlines.csv') %>% 
+  rename(BeachID = 1, Length_km = 14) %>% 
+  select(1,14)
 
 #Note on beach length excel sheet states those names are the standard and so I'll use them as the name list
 beachnames<-beachLength$BeachID
@@ -193,13 +198,47 @@ y<-NULL
 
 adding beach length (from BRC data) and area (google earth beach polygons)
 *will add parking lot size and number information when available*
-```{r physical beach data load}
+```{r physical beach data clean}
 prodData<-left_join(prodData, beachLength, by = 'BeachID')
 
 prodData %>% 
   group_by(BeachID) %>% 
   summarize(nas = sum(is.na(Length_km))) %>% 
   filter(nas > 0) #6 beaches in the productivity sheet without beach length calculated
+
+#reformat and join the extra coastline lengths (done by Allegra) to the beachLength df
+extralengths$Region<-ifelse(extralengths$BeachID %in% c("Chance Harbour", "James", "Bowen Island"), "nNS", "sNS")
+
+beachLength<-rbind(beachLength, extralengths)
+
+#reformat and join the beach area data to beach length
+beachArea<-beachArea %>% 
+  rename(Description = 2) %>% #column name typo
+  select('BeachID', 'Description', 'BeachArea') %>% 
+  filter(!BeachID == 'White Point Beach') #this is in the polygons as gull island, same beach
+
+beachArea$BeachID %<>% 
+  gsub("Crescent Beach", paste(beachnames[15]), .) %>%
+  gsub("Durham Lane",paste(beachnames[20]), .) %>% 
+  gsub("Grahams Cove", paste(beachnames[24]), .) %>%
+  gsub("Harbour Breeze", paste(beachnames[26]), .) %>%
+  gsub("Inverness", paste(beachnames[29]), .) %>% 
+  gsub("Gull Island Beach", paste(beachnames[60]), .) #index 60 is white point, renaming gull island since they're the same beach but most of the data uses white point beach.
+
+beachPhys<-left_join(beachLength, beachArea, by = 'BeachID') %>% 
+  filter(!BeachID == 'Gull Island Beach')
+
+beachPhys %>% 
+  filter(is.na(BeachArea)) # Only 1 NA foxbar, it's included within roundbay's polygon
+
+#creating a column for what manages the beach
+beachPhys$Management<-sub(".*Ownership: ", "", beachPhys$Description)
+beachPhys$Management<-ifelse(grepl("Digitized|Beach Name|digitized", beachPhys$Management), NA, beachPhys$Management)
+
+#manually filling in missing values
+beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay"), "Provincial", beachPhys$Management)
+#beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Federal", beachPhys$Management)
+#beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Municipal", beachPhys$Management)
 ```
 
 
