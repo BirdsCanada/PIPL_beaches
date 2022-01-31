@@ -9,10 +9,24 @@ library(tidyverse)
 ```
 
 To Do:
+-get a number for each beach that shows the amount of land within the buffer (exclude sea)
+-finalize buffer size
 -process landuse data
 -reformat with physical data
 -process survey data into format for analysis
 -visualize
+
+
+currently calculating a percentage of the 30km buffer, but should recalculate to show what portion of that is land, and then calculate a percentage based on that.
+```{r landuse}
+
+ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_wrap(~landclass)
+
+
+
+ggplot(beachPhys, aes(landclass, tot_area_km ))+ geom_boxplot()+facet_wrap(~region)
+```
+
 
 
 

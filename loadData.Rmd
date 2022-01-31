@@ -43,7 +43,7 @@ brc2<-read.csv(file = '../Data/Productivity_2017-2021_LB_BM.csv')
 beachLength<-read.csv(file = '../Data/beachLength.csv') %>% 
   rename(BeachID = 1, Length_km = 3)
 beachArea<-read.csv(file = '../Data/beaches polygon.csv') %>% 
-  rename(BeachID = 1 )
+  rename(BeachID = 1, Description = 2) #description typo
 extralengths<-read.csv(file = '../Data/supplementary coastlines.csv') %>% 
   rename(BeachID = 1, Length_km = 14) %>% 
   select(1,14)
@@ -58,12 +58,12 @@ beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point
 #landuse intersection data, read in and select relevant columns (non-forestry related)
 landuse<-read.csv(file = '../Data/landuse_intersection.csv') %>% 
   select(1:21,38,54:56,67:70,73) %>% 
-  select_if(all_na) %>% 
+  select_if(all_na)%>% 
   rename(Description = 'descriptio')
   
 ```
 
-
+CLeaning and Reformatting
 ### Survey Data (human impact data)
 ```{r clean 2017-2021 survey data}
 
@@ -218,7 +218,6 @@ beachLength<-rbind(beachLength, extralengths)
 
 #reformat and join the beach area data to beach length
 beachArea<-beachArea %>% 
-  rename(Description = 2) %>% #column name typo
   select('BeachID', 'Description', 'BeachArea') %>% 
   filter(!BeachID == 'White Point Beach') #this is in the polygons as gull island, same beach
 
@@ -245,8 +244,25 @@ beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay"), "Provi
 #beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Federal", beachPhys$Management)
 #beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Municipal", beachPhys$Management)
 
-
 ```
+
+minor changes to landuse data
+```{r landuse data}
+#creating a new variable with the landuse assignments
+landuse<-landuse %>% 
+  mutate(landclass = ifelse(landuse$FORNON == 87, "Urban", ifelse(
+    landuse$FORNON == 86, "Agriculture", ifelse(
+    landuse$FORNON == 94, "Beach", "Road")))) %>% 
+  rename(BeachID = 'Name')
+
+#summarize the area within the buffer by landclass designation
+x<-landuse %>% 
+  group_by(BeachID,landclass) %>% 
+  summarize(tot_area = sum(Int_Area), tot_area_km = tot_area/1000000, percentage = tot_area_km/(pi*(30^2))) #currently 30km buffer region data
+
+beachPhys<-inner_join(beachPhys, x, by = 'BeachID')
+```
+
 
 ## End
 
