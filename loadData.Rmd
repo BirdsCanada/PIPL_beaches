@@ -26,7 +26,7 @@ Follow-Up Notes:
 These Beaches are mentioned in spreadsheets but will be excluded since they're not in the BRC or the GIS data and don't appear to be regularly monitored:
 "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm", "Ratcliffe Hills (The Cape)"
 
-
+### Survey Data (human impact data)
 ```{r load data}
 #Here I load in the 2017-2021 BRC data that was downloaded from Nature Counts and saved as a .csv
 all_na <- function(x) any(!is.na(x)) #function to remove columns that are all NA
@@ -261,3 +261,4 @@ beachLength<-NULL
 extralengths<-NULL
 ```
 
+## End
