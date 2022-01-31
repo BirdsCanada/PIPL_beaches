@@ -18,16 +18,17 @@ To Do:
 
 
 currently calculating a percentage of the 30km buffer, but should recalculate to show what portion of that is land, and then calculate a percentage based on that.
-```{r landuse}
+```{r landuse plots}
+ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_wrap(~landclass, scales = "free")
 
-ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_wrap(~landclass)
-
-
-
-ggplot(beachPhys, aes(landclass, tot_area_km ))+ geom_boxplot()+facet_wrap(~region)
-
+ggplot(beachPhys, aes(landclass, tot_area_km, colour = landclass))+ geom_boxplot()+facet_wrap(~Region)
 ```
 
+```{r big dataset}
+data<-inner_join(prodData, beachPhys, by = c('BeachID', 'Length_km', 'Region'))
+
+ggplot(data, aes(x = Length_km, y= YE_pairs, color = Region))+geom_point()
+```
 
 
 
