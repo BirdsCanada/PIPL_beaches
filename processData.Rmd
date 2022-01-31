@@ -25,6 +25,7 @@ ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_w
 
 
 ggplot(beachPhys, aes(landclass, tot_area_km ))+ geom_boxplot()+facet_wrap(~region)
+
 ```
 
 
