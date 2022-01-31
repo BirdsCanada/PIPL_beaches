@@ -18,16 +18,31 @@ To Do:
 
 
 currently calculating a percentage of the 30km buffer, but should recalculate to show what portion of that is land, and then calculate a percentage based on that.
-```{r landuse}
+```{r landuse plots}
+ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_wrap(~landclass, scales = "free")
 
-ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_wrap(~landclass)
-
-
-
-ggplot(beachPhys, aes(landclass, tot_area_km ))+ geom_boxplot()+facet_wrap(~region)
-
+ggplot(beachPhys, aes(landclass, tot_area_km, colour = landclass))+ geom_boxplot()+facet_wrap(~Region)
 ```
 
+```{r big dataset}
+data<-full_join(prodData, beachPhys[, c(1:6)], by = c('BeachID', 'Length_km', 'Region')) %>% 
+  distinct()
+
+test<-full_join((piplSurvey %>% 
+  select(name,year:day, 31:63) %>% 
+  rename(BeachID = name, Year = year)), data,  by = c('BeachID', 'Year'))
+
+goodCols<-c("signs_wetWalker", "signs_dryWalker", "dogs_leashedStart", "dogs_unleashedStart", "dogs_addLeash", "dogs_chaseChicks", "dogs_chaseAdults", "signs_small", "signs_large", "signs_vandalized", "fencedNests", "fencedNests_people", "fencedNests_tracks", "fencedNests_dogTracks", "fencedNests_vandalized", "engagedPeople", "engagedPeople_dogs", "peopleEngaged_dogsTreat", "people_engaged_positive", "vehicles", "vehicles_newTracks", "litter", "peopleTotal", "dogs_leashedTotal", "dogs_unleashedTotal", "dogs_chaseNonPIPL", "kites", "kitesurfers", "kitebuggies", "noSigns_wetWalker", "noSigns_dryWalker", "vehicles_transitTracks", "vehicles_joyrideTracks")
+
+
+ggplot(data, aes(x = BeachArea, y= Productivity, color = Region))+geom_point()
+ggplot(data, aes(x = Length_km, y= Productivity, color = Region))+geom_point()
+
+ggplot(data, aes(x = BeachArea, y= YE_pairs, color = Region))+geom_point()
+ggplot(data, aes(x = Length_km, y= YE_pairs, color = Region))+geom_point()
+
+ggplot(data, aes())
+```
 
 
 

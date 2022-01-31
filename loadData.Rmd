@@ -26,7 +26,7 @@ Follow-Up Notes:
 These Beaches are mentioned in spreadsheets but will be excluded since they're not in the BRC or the GIS data and don't appear to be regularly monitored:
 "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm", "Ratcliffe Hills (The Cape)"
 
-### Survey Data (human impact data)
+
 ```{r load data}
 #Here I load in the 2017-2021 BRC data that was downloaded from Nature Counts and saved as a .csv
 all_na <- function(x) any(!is.na(x)) #function to remove columns that are all NA
@@ -248,6 +248,21 @@ beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay"), "Provi
 
 minor changes to landuse data
 ```{r landuse data}
+setdiff(landuse$Name, beachnames) #some problems
+
+landuse$Name %<>% 
+  gsub("Crescent Beach", paste(beachnames[15]), .) %>%
+  gsub("Durham Lane",paste(beachnames[20]), .) %>% 
+  gsub("Grahams Cove", paste(beachnames[24]), .) %>%
+  gsub("Harbour Breeze", paste(beachnames[26]), .) %>%
+  gsub("Inverness", paste(beachnames[29]), .) %>% 
+  gsub("Gull Island Beach", paste(beachnames[60]), .)
+
+#manually assigning names that aren't working with gsub
+#port joli (goose haven) 271-275
+x<-which(landuse$Name == "Port Joli (Goose Haven)") #find all rows with the wrong name
+landuse[paste(x), 'Name']<-"Goose Haven" #replace with correct name beachnames[64]
+
 #creating a new variable with the landuse assignments
 landuse<-landuse %>% 
   mutate(landclass = ifelse(landuse$FORNON == 87, "Urban", ifelse(
@@ -275,6 +290,7 @@ brc2<-NULL
 beachArea<-NULL
 beachLength<-NULL
 extralengths<-NULL
+landuse<-NULL
 ```
 
 ## End
