@@ -21,8 +21,6 @@ Follow-Up Notes:
 -loc_id What is this? is it a coordinates or correlates to a beach?
 -Not sure what to do about locations joined in some years but separate in others
 -2012-2017 BRC I have all Northern NS survey data raw, but only sandwalkers and dog raw for southern (email someone if needed)
-<<<<<<< HEAD
--I have no idea what's going on with goose (indian) point, and goose and burks point?? Are these the same site??? Goose (Indian) Point is half of Goose and Burks point
 
 
 These Beaches are mentioned in spreadsheets but will be excluded since they're not in the BRC or the GIS data and don't appear to be regularly monitored:
@@ -57,9 +55,16 @@ beachnames<-beachLength$BeachID
 beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point", "Goose Haven", "Taylor Head Bay", "Chance Harbour")) #
 #James and Bowen Island are sometimes apart, others are from BRC
 
+#landuse intersection data, read in and select relevant columns (non-forestry related)
+landuse<-read.csv(file = '../Data/landuse_intersection.csv') %>% 
+  select(1:21,38,54:56,67:70,73) %>% 
+  select_if(all_na) %>% 
+  rename(Description = 'descriptio')
+  
 ```
 
 
+### Survey Data (human impact data)
 ```{r clean 2017-2021 survey data}
 
 beaches<-piplSurveyAll %>% 
@@ -98,7 +103,7 @@ Do I want raw data or are the summaries fine?
 
 ```
 
-
+### Plover Productivity Data (breeding pairs and productivity)
 Here I load and clean the productivity data from 2012-2021 surveys
 ```{r clean productivity data}
 
@@ -192,10 +197,10 @@ prodData<-left_join(y, prodData, by = 'BeachID') %>%
   rename(County = County.x) %>% 
   select(1:2,4:10) #remove old column with typos
 
-x<-NULL
-y<-NULL
+
 ```
 
+### Physical Beach Data (Area and Length)
 adding beach length (from BRC data) and area (google earth beach polygons)
 *will add parking lot size and number information when available*
 ```{r physical beach data clean}
@@ -239,7 +244,20 @@ beachPhys$Management<-ifelse(grepl("Digitized|Beach Name|digitized", beachPhys$M
 beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay"), "Provincial", beachPhys$Management)
 #beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Federal", beachPhys$Management)
 #beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Municipal", beachPhys$Management)
+
+
 ```
 
+## End
 
+just removing extra dfs that aren't clean or needed
+```{r cleanup}
+x<-NULL
+y<-NULL
+brc1<-NULL
+brc2<-NULL
+beachArea<-NULL
+beachLength<-NULL
+extralengths<-NULL
+```
 

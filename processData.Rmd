@@ -1,0 +1,29 @@
+---
+title: "ProcessingData"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+To Do:
+-process landuse data
+-reformat with physical data
+-process survey data into format for analysis
+-visualize
+
+
+
+
+
+
+
+
+
+
+
+
+
+
