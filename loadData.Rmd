@@ -80,12 +80,13 @@ y<-piplSurveyAll %>%
   filter(statprov_code == 'NS') 
 
 setdiff(x,y)  #one extra entry in x, use unique id to find form_id 101563 labelled as MB but NS beach
-x<-NULL
-y<-NULL
-#beaches<-NULL
 
 #fixing the mislabelled data point, form_id 101563 labelled as MB
 piplSurveyAll[piplSurveyAll$form_id == 101563, 'statprov_code']<-"NS"
+
+#rename columns in survey data so they're easier to work with
+goodCols<-c("signs_wetWalker", "signs_dryWalker", "dogs_leashedStart", "dogs_unleashedStart", "dogs_addLeash", "dogs_chaseChicks", "dogs_chaseAdults", "signs_small", "signs_large", "signs_vandalized", "fencedNests", "fencedNests_people", "fencedNests_tracks", "fencedNests_dogTracks", "fencedNests_vandalized", "engagedPeople", "engagedPeople_dogs", "peopleEngaged_dogsTreat", "people_engaged_positive", "vehicles", "vehicles_newTracks", "litter", "peopleTotal", "dogs_leashedTotal", "dogs_unleashedTotal", "dogs_chaseNonPIPL", "kites", "kitesurfers", "kitebuggies", "noSigns_wetWalker", "noSigns_dryWalker", "vehicles_transitTracks", "vehicles_joyrideTracks")
+colnames(piplSurveyAll)[54:86]<-goodCols
 
 range(piplSurveyAll$year) #includes observations from 1999-2005 exclude for now
 
@@ -291,6 +292,7 @@ beachArea<-NULL
 beachLength<-NULL
 extralengths<-NULL
 landuse<-NULL
+piplSurveyAll<-NULL
 ```
 
 ## End
