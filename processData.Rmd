@@ -32,6 +32,7 @@ test<-full_join((piplSurvey %>%
   select(name,year:day, 31:63) %>% 
   rename(BeachID = name, Year = year)), data,  by = c('BeachID', 'Year'))
 
+#rename columns in survey data for easier work
 goodCols<-c("signs_wetWalker", "signs_dryWalker", "dogs_leashedStart", "dogs_unleashedStart", "dogs_addLeash", "dogs_chaseChicks", "dogs_chaseAdults", "signs_small", "signs_large", "signs_vandalized", "fencedNests", "fencedNests_people", "fencedNests_tracks", "fencedNests_dogTracks", "fencedNests_vandalized", "engagedPeople", "engagedPeople_dogs", "peopleEngaged_dogsTreat", "people_engaged_positive", "vehicles", "vehicles_newTracks", "litter", "peopleTotal", "dogs_leashedTotal", "dogs_unleashedTotal", "dogs_chaseNonPIPL", "kites", "kitesurfers", "kitebuggies", "noSigns_wetWalker", "noSigns_dryWalker", "vehicles_transitTracks", "vehicles_joyrideTracks")
 
 
