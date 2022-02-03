@@ -18,14 +18,14 @@ To Do:
 -pca of survey variables
 
 
-currently calculating a percentage of the 30km buffer, but should recalculate to show what portion of that is land, and then calculate a percentage based on that.
+percentage of the landuse categories is based off land area present within the buffer, not including ocean or water bodies within.
 ```{r landuse plots}
 ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_wrap(~landclass, scales = "free")
 
 ggplot(beachPhys, aes(landclass, tot_area_km, colour = landclass))+ geom_boxplot()+facet_wrap(~Region)
 ```
 
-I want to widen beachPhys but cannot? pivot_wider is giving a weird error
+
 ```{r big dataset}
 beachPhysW<-beachPhys %>% 
   pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
