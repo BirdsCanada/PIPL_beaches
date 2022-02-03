@@ -27,9 +27,27 @@ These Beaches are mentioned in spreadsheets but will be excluded since they're n
 "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm", "Ratcliffe Hills (The Cape)"
 
 
+Here I load in the 2017-2021 BRC data that was downloaded from Nature Counts and saved as a .csv
 ```{r load data}
-#Here I load in the 2017-2021 BRC data that was downloaded from Nature Counts and saved as a .csv
-all_na <- function(x) any(!is.na(x)) #function to remove columns that are all NA
+#function to remove columns that are all NA
+all_na <- function(x) any(!is.na(x)) 
+
+#create a function to clean dfs from QGIS
+#where dat has a name column in first column (either BeachID or Name)
+#must have beachnames vector loaded with the correct 66 spellings
+QGIS_names<-function(dat = dat){
+  dat[,1]%<>% 
+  gsub("Crescent Beach", paste(beachnames[15]), .) %>%
+  gsub("Durham Lane",paste(beachnames[20]), .) %>% 
+  gsub("Grahams Cove", paste(beachnames[24]), .) %>%
+  gsub("Harbour Breeze", paste(beachnames[26]), .) %>%
+  gsub("Inverness", paste(beachnames[29]), .) %>% 
+  gsub("Gull Island Beach", paste(beachnames[60]), .)
+  
+  x<-which(dat[,1] == "Port Joli (Goose Haven)") #find all rows with the wrong name
+dat[paste(x), 1]<-"Goose Haven" #replace with correct name beachnames[64]
+return(dat)
+}
 
 #path goes back a level to enter Data folder and access csv
 piplSurveyAll<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>% 
@@ -59,11 +77,23 @@ beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point
 landuse<-read.csv(file = '../Data/landuse_intersection.csv') %>% 
   select(1:21,38,54:56,67:70,73) %>% 
   select_if(all_na)%>% 
-  rename(Description = 'descriptio')
-  
+  rename(Description = descriptio, BeachID = Name)
+landuse<-QGIS_names(landuse)
+
+#buffer area (only the intersection of the buffer and NS land area)
+buffer_area<-read.csv(file = '../Data/intersection_area.csv') %>% 
+  select(Name, Int_Area) %>% 
+  rename(land_area = Int_Area, BeachID = Name)
+buffer_area<-QGIS_names(buffer_area)
+
+#beachuse is all beach landuse polygons in a 2km buffer (foraging)
+beachuse<-read.csv(file = '../Data/beach_intersection.csv') %>% 
+  select_if(all_na) %>% 
+  select(1:2,58:59,64) %>% 
+  rename(BeachID = Name, Description = descriptio, beach_area = union_area)
 ```
 
-CLeaning and Reformatting
+Cleaning and Reformatting
 ### Survey Data (human impact data)
 ```{r clean 2017-2021 survey data}
 
@@ -130,6 +160,7 @@ setdiff(brc2$BeachID, beachnames) #mostly spelling errors, a few places not name
 setdiff(brc1$BeachID, beachnames) #this list has more beaches not named elsewhere that will be excluded
                                
 #using the lists above I manually assigned the correct spelling from the complete list (beachnames)
+#these aren't the same as the QGIS misspellings so I did it manually
 brc1$BeachID %<>% 
   gsub("Goose Haven, Port Joli", paste(beachnames[64]), .) %>% 
   gsub("Grahams Cove / Ferry Road", paste(beachnames[24]), .) %>%
@@ -222,13 +253,7 @@ beachArea<-beachArea %>%
   select('BeachID', 'Description', 'BeachArea') %>% 
   filter(!BeachID == 'White Point Beach') #this is in the polygons as gull island, same beach
 
-beachArea$BeachID %<>% 
-  gsub("Crescent Beach", paste(beachnames[15]), .) %>%
-  gsub("Durham Lane",paste(beachnames[20]), .) %>% 
-  gsub("Grahams Cove", paste(beachnames[24]), .) %>%
-  gsub("Harbour Breeze", paste(beachnames[26]), .) %>%
-  gsub("Inverness", paste(beachnames[29]), .) %>% 
-  gsub("Gull Island Beach", paste(beachnames[60]), .) #index 60 is white point, renaming gull island since they're the same beach but most of the data uses white point beach.
+beachArea<-QGIS_names(beachArea)
 
 beachPhys<-left_join(beachLength, beachArea, by = 'BeachID') %>% 
   filter(!BeachID == 'Gull Island Beach')
@@ -247,43 +272,54 @@ beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay"), "Provi
 
 ```
 
-minor changes to landuse data
-```{r landuse data}
-setdiff(landuse$Name, beachnames) #some problems
 
-landuse$Name %<>% 
-  gsub("Crescent Beach", paste(beachnames[15]), .) %>%
-  gsub("Durham Lane",paste(beachnames[20]), .) %>% 
-  gsub("Grahams Cove", paste(beachnames[24]), .) %>%
-  gsub("Harbour Breeze", paste(beachnames[26]), .) %>%
-  gsub("Inverness", paste(beachnames[29]), .) %>% 
-  gsub("Gull Island Beach", paste(beachnames[60]), .)
-
-#manually assigning names that aren't working with gsub
-#port joli (goose haven) 271-275
-x<-which(landuse$Name == "Port Joli (Goose Haven)") #find all rows with the wrong name
-landuse[paste(x), 'Name']<-"Goose Haven" #replace with correct name beachnames[64]
-
+```{r landuse processing}
 #creating a new variable with the landuse assignments
 landuse<-landuse %>% 
   mutate(landclass = ifelse(landuse$FORNON == 87, "Urban", ifelse(
     landuse$FORNON == 86, "Agriculture", ifelse(
-    landuse$FORNON == 94, "Beach", "Road")))) %>% 
-  rename(BeachID = 'Name')
+    landuse$FORNON == 94, "Beach", "Road"))))
+
+#fixing beachuse, qgis union created two sets of columns I need to fill one and keep it
+beachuse[beachuse == ""] <- NA
+
+beachuse$BeachID<-ifelse(is.na(beachuse$BeachID), beachuse$Name_2, beachuse$BeachID)
+beachuse$Description<-ifelse(is.na(beachuse$Description), beachuse$Name_2, beachuse$Description)
+
+beachuse<-beachuse %>% 
+  select(1,2,5)
+beachuse<-QGIS_names(beachuse) #fixing misspellings from QGIS data
 
 #summarize the area within the buffer by landclass designation
 x<-landuse %>% 
   group_by(BeachID,landclass) %>% 
-  summarize(tot_area = sum(Int_Area), tot_area_km = tot_area/1000000, percentage = tot_area_km/(pi*(30^2))) #currently 30km buffer region data
+  summarize(tot_area = sum(Int_Area), tot_area_km = tot_area/1000000) #currently 30km buffer region data
+x<-left_join(x,buffer_area) %>% 
+  mutate(percentage = tot_area/land_area)
 
-beachPhys<-inner_join(beachPhys, x, by = 'BeachID')
+y<-beachuse %>% 
+  group_by(BeachID) %>% 
+  summarize(tot_area_beach = sum(beach_area), tot_area_beach_km = tot_area_beach/1000000) # currently 2km buffer
+
+x<-x %>% 
+  mutate(temp = paste(BeachID, landclass, sep = "_"))
+y<-y %>% 
+  mutate(temp = paste(BeachID, "_Beach", sep =""))
+
+x<-full_join(x,y, by = c('temp', 'BeachID'))
+x$tot_area<-ifelse(x$landclass =='Beach', x$tot_area_beach, x$tot_area)
+x$tot_area_km<-ifelse(x$landclass =='Beach', x$tot_area_beach_km, x$tot_area_km)  
+x$percentage<-ifelse(x$landclass =='Beach', NA, x$percentage)
+
+#join x to BeachPhys, but remove last row adn last 3 columns
+beachPhys<-full_join(beachPhys, x[,1:6], by = 'BeachID')
 ```
 
 
 ## End
 
 just removing extra dfs that aren't clean or needed
-```{r cleanup}
+```{r cleanup, eval = FALSE}
 x<-NULL
 y<-NULL
 brc1<-NULL
@@ -293,6 +329,7 @@ beachLength<-NULL
 extralengths<-NULL
 landuse<-NULL
 piplSurveyAll<-NULL
+beachuse<-NULL
 ```
 
 ## End

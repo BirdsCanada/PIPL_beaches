@@ -15,6 +15,7 @@ To Do:
 -reformat with physical data
 -process survey data into format for analysis
 -visualize
+-pca of survey variables
 
 
 currently calculating a percentage of the 30km buffer, but should recalculate to show what portion of that is land, and then calculate a percentage based on that.
@@ -27,11 +28,13 @@ ggplot(beachPhys, aes(landclass, tot_area_km, colour = landclass))+ geom_boxplot
 I want to widen beachPhys but cannot? pivot_wider is giving a weird error
 ```{r big dataset}
 beachPhysW<-beachPhys %>% 
-  pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage))
+  pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
+  select(-12,-17,-19,-22)
 
 beachData<-full_join(prodData, beachPhysW, by = c('BeachID', 'Length_km', 'Region')) %>% 
   distinct()
 
+#this may not be very useful
 data<-full_join((piplSurvey %>% 
   select(name,year:day,19, 31:63) %>% 
   rename(BeachID = name, Year = year)), beachData,  by = c('BeachID', 'Year'))
