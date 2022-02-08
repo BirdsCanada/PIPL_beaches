@@ -27,6 +27,7 @@ ggplot(beachPhys, aes(landclass, tot_area_km, colour = landclass))+ geom_boxplot
 
 
 ```{r big dataset}
+#Need to fix goose haven in this dataset
 beachPhysW<-beachPhys %>% 
   pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
   select(-12,-17,-19,-22)
@@ -39,17 +40,34 @@ data<-full_join((piplSurvey %>%
   select(name,year:day,19, 31:63) %>% 
   rename(BeachID = name, Year = year)), beachData,  by = c('BeachID', 'Year'))
 
-ggplot(data, aes(x = BeachArea, y= Productivity, color = Region))+geom_point()
-ggplot(data, aes(x = Length_km, y= Productivity, color = Region))+geom_point()
+data[data == ""] <- NA #just fixing missing values formatting
 
-ggplot(data, aes(x = BeachArea, y= YE_pairs, color = Region))+geom_point()
-ggplot(data, aes(x = Length_km, y= YE_pairs, color = Region))+geom_point()
-
-ggplot(data, aes(dogs_unleashedTotal, Productivity))+geom_point()
-ggplot(data, aes(dogs_leashedTotal, Productivity))+geom_point()
 ```
 
 
+I messed around with prcomp but I'm getting an error about missing/infinite values even when omitting NAs, which reminded me nmds with bray curtis is better for null values which we have
+```{r nmds?}
+library(vegan)
+#change columns to numeric if going into a pca
+cols.num <- c(2,5:38,40:45,47:49,51:62)
+data[cols.num] <- sapply(data[cols.num],as.numeric)
+
+data_mat<-data %>% 
+  select(c(2,5:38,40:45,47:49,51:62)) %>% 
+  filter_all(any_vars(. != 0))
+#NEED to sum columns to look for only 0 columns
+data %>% 
+  select(c(2,5:38,40:45,47:49,51:62)) %>% 
+  filter_all(any_vars(. != 0))
+
+metaMDS(data_mat, k = 2, na.rm = TRUE, distance="bray")
+
+test<-data %>% 
+  group_by(BeachID) %>% 
+  summarize(sum = sum(is.na(Management)))
+test2<-data %>% 
+  select(1, 50)
+```
 
 
 

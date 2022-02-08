@@ -7,6 +7,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(magrittr)
 library(tidyverse)
+library(fuzzyjoin)
 ```
 
 Note: I'm using relative paths as of right now, my file structure includes a folder with the project subdirectory and a Data folder within, my wd is the project subdirectory
@@ -53,6 +54,10 @@ return(dat)
 piplSurveyAll<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>% 
   select_if(all_na) # removes empty columns
 
+pipl2014<-read.csv(file = '../Data/SWNS_2014.csv')
+pipl2015<-read.csv(file = '../Data/SWNS_2015.csv')
+pipl2016<-read.csv(file = '../Data/SWNS_2016.csv')
+
 #Here I load and clean the productivity data from 2012-2021 surveys
 brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
 brc2<-read.csv(file = '../Data/Productivity_2017-2021_LB_BM.csv') 
@@ -70,7 +75,7 @@ extralengths<-read.csv(file = '../Data/supplementary coastlines.csv') %>%
 beachnames<-beachLength$BeachID
 
 #most complete beachnames list with correct spelling
-beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point", "Goose Haven", "Taylor Head Bay", "Chance Harbour")) #
+beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point", "Goose Haven", "Taylor Head Bay", "Chance Harbour", "Round Bay", "Roseway", "Hawk Point & The Hawk")) #
 #James and Bowen Island are sometimes apart, others are from BRC
 
 #landuse intersection data, read in and select relevant columns (non-forestry related)
@@ -128,11 +133,115 @@ piplSurvey<-piplSurveyAll %>%
 
 ```
 
-Have all Northern NS survey data raw, but only sandwalkers and dog raw for southern
-Do I want raw data or are the summaries fine?
-```{r clean 2012-2016 survey data}
+Southern NS data has separate sheets with different columns and names, so I'm manually assigning uniform column names by position
+```{r clean 2014-2016 survey data}
+surveyCols<-colnames(piplSurvey)
 
+pipl2014<-pipl2014 %>% 
+  select(1,2,4:19,21:33,35:47,62:65) %>% #selects variables in piplSurvey
+  separate('Survey.Date..dd.mm.', c('day', 'month'), sep = '/', convert = TRUE) %>% 
+  rename(Survey_effort_min = Survey.effort..min., vehicles_and_tracks = sum.veh.and.tracks)
+#sync up column names to join all data together
+colnames(pipl2014)[c(1:5,7:40,42:49)]<-surveyCols[c(5:10,2,19,18,21:22,24:26,30,27:29,31:59)]
+
+pipl2015<-pipl2015 %>% 
+  select(1:3,5:20,26:53,67:70)  %>% 
+  rename(Survey_effort_min = Survey.effort..min., vehicles_and_tracks = SUM.veh, fencedNests_dogs = X..of.dogs.inside.symbolic.fencing, peopleEngaged_total = TOT.people.spoken.to)
+#sync up column names to join all data together
+colnames(pipl2015)[c(1:5,7:32,34:37,39:42,44:51)]<-surveyCols[c(5:9,2,10,19,18,21:22,24:26,30,27:29,31:51,54:55,53,52,56:59)]
+
+pipl2016<-pipl2016 %>% 
+  select(1,68:69,3:6,9:15,70,16:19,24:49,64:67) %>% 
+  rename(Survey_effort_min = Survey.Effort..min., fencedNests_dogs = Dogs.Inside.Fencing)
+#sync up column names to join all data together
+colnames(pipl2016)[c(1:5,7:32,34:49)]<-surveyCols[c(5:9,2,10,19,18,21:22,24:26,30,27:29,31:51,54:55,53,52,56:59)]
+
+#reformatting columns present, and column types to bind together
+pipl2015<-pipl2015 %>% select(c(-'vehicles_and_tracks', -'peopleEngaged_total', -'fencedNests_dogs'))
+pipl2014<-pipl2014 %>% select(c(-'vehicles_and_tracks'))
+pipl2016<-pipl2016 %>% select(c(-'fencedNests_dogs'))
+
+sapply(pipl2014, class)
+
+pipl2014<-pipl2014 %>% 
+  mutate_at(vars(4:5,7:8,11:12), as.character) %>% 
+  mutate_at(vars(1:3,6,9:10,13:15,17:18,20:48), as.numeric) %>% 
+  mutate_at(vars(16,19), as.logical)
+
+pipl2015<-pipl2015 %>% 
+  mutate_at(vars(4:5,7:8,11:12), as.character) %>% 
+  mutate_at(vars(1:3,6,9:10,13:15,17:18,20:48), as.numeric) %>% 
+  mutate_at(vars(16,19), as.logical)
+
+pipl2016<-pipl2016 %>% 
+  mutate_at(vars(4:5,7:8,11:12), as.character) %>% 
+  mutate_at(vars(1:3,6,9:10,13:15,17:18,20:48), as.numeric) %>% 
+  mutate_at(vars(16,19), as.logical)
+
+x<-bind_rows(pipl2014, pipl2015, pipl2016) %>% 
+  select(-'cloud_cover',-'tide_state')
+
+#reformat piplSurvey to match
+
+y<-piplSurvey %>% 
+  mutate_at(vars(2:4,8:11,17), as.character) %>% 
+  mutate_at(vars(5:7,18:22,31:63), as.numeric)
+y$New.Nests.Found<-as.logical(ifelse(y$New.Nests.Found == "Yes", TRUE, FALSE))
+y$Nest.Chicks.Checked<-as.logical(ifelse(y$Nest.Chicks.Checked == "Yes", TRUE, FALSE))
+
+#one big dataset, needs beachID cleaned
+piplSurvey<-bind_rows(x, y) %>% 
+  arrange(year) %>% 
+  rename(BeachID = name) %>% 
+  select(7,1:6,8:64) %>% 
+  filter(!is.na(year))
 ```
+
+
+```{r fixing names for big data}
+#plus signs break the code, so manually doing these
+piplSurvey[piplSurvey == "Hawk Pt+The Hawk"]<-"Hawk Point & The Hawk"
+piplSurvey[piplSurvey == "Roseway+RoundBay"]<-"Round Bay & Roseway"
+
+piplSurvey$BeachID %<>%
+  gsub("'", "", .)
+
+#this doesn't match properly in fuzzy join so manually reassigning
+piplSurvey[piplSurvey$BeachID == "Silver Sands (Cow Bay)",]<- "Cow Bay"
+piplSurvey[piplSurvey$BeachID == "Stoney Beach",]<- "Stoney (Lawrencetown Head)"
+piplSurvey[piplSurvey$BeachID == "Lawrencetown Beach",]<- "Stoney (Lawrencetown Head)"
+
+#removing beaches not on the list
+WrongBeaches<-c("Maughers Beach", "MacCormacks Beach", "Point Michaud", "Keating Cove", "Purgatory Point")
+piplSurvey<-piplSurvey %>% 
+  filter(!BeachID %in% WrongBeaches)
+
+#still too many small spelling mistakes, used a fuzzy join (did a test to ensure correct pairs)
+x<-as.data.frame(piplSurvey$BeachID) %>% 
+  rename(BeachID = 1)
+y<-as.data.frame(beachnames) %>% 
+  rename(BeachID = 1)
+
+x<-stringdist_join(x, y, 
+                by = "BeachID",
+                mode = "left",
+                ignore_case = FALSE, 
+                method = "jw", 
+                max_dist = 99, 
+                distance_col = "dist") %>%
+  group_by(BeachID.x) %>%
+  slice_min(order_by = dist, n = 1) %>% 
+  unique
+
+colnames(x)<-c("BeachID", "correction", "dist")
+
+piplSurvey<-left_join(piplSurvey, x, by = 'BeachID') %>% 
+  rename(BeachID_original = BeachID, BeachID = correction) %>% 
+  select(BeachID, year:vehicles_joyrideTracks)
+
+setdiff(piplSurvey$BeachID, beachnames) #all good  
+```
+
 
 ### Plover Productivity Data (breeding pairs and productivity)
 Here I load and clean the productivity data from 2012-2021 surveys
@@ -266,10 +375,12 @@ beachPhys$Management<-sub(".*Ownership: ", "", beachPhys$Description)
 beachPhys$Management<-ifelse(grepl("Digitized|Beach Name|digitized", beachPhys$Management), NA, beachPhys$Management)
 
 #manually filling in missing values
-beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay"), "Provincial", beachPhys$Management)
-#beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Federal", beachPhys$Management)
-#beachPhys$Management<-ifelse(beachPhys$BeachID %in% c(??), "Municipal", beachPhys$Management)
 
+##Ogdens pond and Harbour breeze not entirely sure yet
+##Still missing Green Bay and Durham Lane
+beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Burks Point", "Chance Harbour", "Fox Bar", "Goose Haven", "Harbour Breeze, Port Joli", "Middle Harbour", "Ogdens Pond", "Roaring Bull Point", "White Point Beach"), "Private", beachPhys$Management)
+beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Inverness Beach", "Cow Bay"), "Municipal", beachPhys$Management)
+beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay", "Hirtles"), "Provincial", beachPhys$Management) #hirtles is also managed municipally
 ```
 
 
@@ -330,6 +441,9 @@ extralengths<-NULL
 landuse<-NULL
 piplSurveyAll<-NULL
 beachuse<-NULL
+pipl2014<-NULL
+pipl2015<-NULL
+pipl2016<-NULL
 ```
 
 ## End
