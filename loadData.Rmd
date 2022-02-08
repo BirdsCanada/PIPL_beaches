@@ -51,12 +51,18 @@ return(dat)
 }
 
 #path goes back a level to enter Data folder and access csv
+
+#survey data for all sites for 2017-2021
 piplSurveyAll<-read.csv(file = '../Data/dbo_vwAtPiplHeader2021.csv') %>% 
   select_if(all_na) # removes empty columns
 
+#Southern NS beaches for 2014-2016 BRC
 pipl2014<-read.csv(file = '../Data/SWNS_2014.csv')
 pipl2015<-read.csv(file = '../Data/SWNS_2015.csv')
 pipl2016<-read.csv(file = '../Data/SWNS_2016.csv')
+
+# survey data for Northern NS for 2014-2016 BRC
+pipl_NNS<-read.csv(file = '../Data/NNS_ReportCard_rawdata.csv')
 
 #Here I load and clean the productivity data from 2012-2021 surveys
 brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
@@ -101,7 +107,6 @@ beachuse<-read.csv(file = '../Data/beach_intersection.csv') %>%
 Cleaning and Reformatting
 ### Survey Data (human impact data)
 ```{r clean 2017-2021 survey data}
-
 beaches<-piplSurveyAll %>% 
   filter(statprov_code=="NS") %>% 
   select(name) %>% 
@@ -135,6 +140,7 @@ piplSurvey<-piplSurveyAll %>%
 
 Southern NS data has separate sheets with different columns and names, so I'm manually assigning uniform column names by position
 ```{r clean 2014-2016 survey data}
+##Southern
 surveyCols<-colnames(piplSurvey)
 
 pipl2014<-pipl2014 %>% 
@@ -161,8 +167,6 @@ pipl2015<-pipl2015 %>% select(c(-'vehicles_and_tracks', -'peopleEngaged_total', 
 pipl2014<-pipl2014 %>% select(c(-'vehicles_and_tracks'))
 pipl2016<-pipl2016 %>% select(c(-'fencedNests_dogs'))
 
-sapply(pipl2014, class)
-
 pipl2014<-pipl2014 %>% 
   mutate_at(vars(4:5,7:8,11:12), as.character) %>% 
   mutate_at(vars(1:3,6,9:10,13:15,17:18,20:48), as.numeric) %>% 
@@ -181,8 +185,13 @@ pipl2016<-pipl2016 %>%
 x<-bind_rows(pipl2014, pipl2015, pipl2016) %>% 
   select(-'cloud_cover',-'tide_state')
 
-#reformat piplSurvey to match
+### NNS Sites, missing many columns I'm not sure it's worth including, also vandalized signs is logical not a count
 
+#pipl_NNS<-pipl_NNS %>% select(1:5,8:12,15,17,19,21:24,26)
+#colnames(pipl_NNS)[c(1,3:5,18,6:17)]<-surveyCols[c(5,10,38:40,33:35,54:55,31:32,53,46:47,49,51)]
+#pipl_NNS<- pipl_NNS %>% select(1:17) %>% rename(Survey_effort_min = effort.min, BeachID = name)
+
+#reformat piplSurvey to match
 y<-piplSurvey %>% 
   mutate_at(vars(2:4,8:11,17), as.character) %>% 
   mutate_at(vars(5:7,18:22,31:63), as.numeric)
