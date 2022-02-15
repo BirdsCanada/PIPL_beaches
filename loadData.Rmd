@@ -62,7 +62,7 @@ pipl2015<-read.csv(file = '../Data/SWNS_2015.csv')
 pipl2016<-read.csv(file = '../Data/SWNS_2016.csv')
 
 # survey data for Northern NS for 2014-2016 BRC
-pipl_NNS<-read.csv(file = '../Data/NNS_ReportCard_rawdata.csv')
+#pipl_NNS<-read.csv(file = '../Data/NNS_ReportCard_rawdata.csv')
 
 #Here I load and clean the productivity data from 2012-2021 surveys
 brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
@@ -193,8 +193,8 @@ x<-bind_rows(pipl2014, pipl2015, pipl2016) %>%
 
 #reformat piplSurvey to match
 y<-piplSurvey %>% 
-  mutate_at(vars(2:4,8:11,17), as.character) %>% 
-  mutate_at(vars(5:7,18:22,31:63), as.numeric)
+  mutate(across(c(2:4,8:11,17), as.character)) %>% 
+  mutate(across(c(5:7,18:22,31:63), as.numeric))
 y$New.Nests.Found<-as.logical(ifelse(y$New.Nests.Found == "Yes", TRUE, FALSE))
 y$Nest.Chicks.Checked<-as.logical(ifelse(y$Nest.Chicks.Checked == "Yes", TRUE, FALSE))
 
@@ -203,7 +203,10 @@ piplSurvey<-bind_rows(x, y) %>%
   arrange(year) %>% 
   rename(BeachID = name) %>% 
   select(7,1:6,8:64) %>% 
-  filter(!is.na(year))
+  filter(!is.na(year)) 
+
+#piplSurvey_test<-piplSurvey %>% 
+  #mutate(across(c(2:4,7,9:13,15:16,18:46), as.numeric))
 ```
 
 
@@ -347,13 +350,19 @@ prodData<-left_join(y, prodData, by = 'BeachID') %>%
   rename(County = County.x) %>% 
   select(1:2,4:10) #remove old column with typos
 
-
+#fix empty Productivity
+prodData$temp<-prodData$Productivity
+prodData$temp<-ifelse(is.na(prodData$Fledglings), NA, ifelse(
+   is.na(prodData$temp), 0, prodData$Productivity))
+prodData$Productivity<-prodData$temp
+prodData$temp<-NULL
 ```
 
 ### Physical Beach Data (Area and Length)
 adding beach length (from BRC data) and area (google earth beach polygons)
 *will add parking lot size and number information when available*
 ```{r physical beach data clean}
+beachLength
 prodData<-left_join(prodData, beachLength, by = 'BeachID')
 
 prodData %>% 
@@ -433,6 +442,12 @@ x$percentage<-ifelse(x$landclass =='Beach', NA, x$percentage)
 
 #join x to BeachPhys, but remove last row adn last 3 columns
 beachPhys<-full_join(beachPhys, x[,1:6], by = 'BeachID')
+
+# fix goose haven naming, replace region and length with Port Joli (Goose Haven) values and then remove
+beachPhys$Region[beachPhys$BeachID == "Goose Haven"]<- "sNS"
+beachPhys$Length_km[beachPhys$BeachID == "Goose Haven"]<-0.477
+beachPhys<- beachPhys %>% 
+  filter(!BeachID == "Port Joli (Goose Haven)")
 ```
 
 
@@ -453,6 +468,7 @@ beachuse<-NULL
 pipl2014<-NULL
 pipl2015<-NULL
 pipl2016<-NULL
+buffer_area<-NULL
 ```
 
 ## End

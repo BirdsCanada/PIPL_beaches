@@ -1,0 +1,71 @@
+---
+title: "analyzeData"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lme4)
+```
+
+## Stats Plan Ideas/Notes
+
+Model with all beaches data (CWS prod data and physical data)
+-maybe use a category of always has pipls, never has pipls, sometimes has pipls
+- prod_var ~ Length_km + beachArea + urban_percent + agr_percent + road_percent + beach_forage + *beach width(?)* + (1|Year) + (1|BeachID) ?????
+- this model would cover physical characteristics only
+- look into how we can do effect size, could drop factors and look at variation explained and it's change (sensu Sarah paper)
+- serious con of not being able to compare effect size of diff types within a model
+- probably over-paramaterized
+
+Human survey data
+- could model based on categorical productivity variable to assess what's important
+- could just summarize and put into a more generic model (base off BRC)
+- If I model this it could help direct the BRC, what should we rate
+- nested model BeachID/Year, can have specific human summary variables per beach per year
+
+Overall model
+- Should I try to do one big model??
+- split into types of factors? human, physical, environmental? One model each?
+
+
+
+## Models
+So far beach area and foraging area are potentially significant
+no validation has occurred
+```{r poisson regression}
+library(optimx)
+
+hist(beachData$YE_pairs)
+mean(beachData$YE_pairs, na.rm = TRUE) #0.782
+var(beachData$YE_pairs, na.rm = TRUE) #1.668
+
+#all 3 have a warning about diff scalings (from scalecheck() in optimx pkg), validate to assess
+test<- glmer(YE_pairs ~ BeachArea_km + Length_km + tot_area_km_Beach + developedLand + Management + Year + (1|BeachID), data = mod_data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+
+#no convergence:  degenerate  Hessian with 1 negative eigenvalues
+test2<- glmer(YE_pairs ~ BeachArea_km + Length_km + tot_area_km_Beach + developedLand + Management + County + Year + (1|BeachID), data = mod_data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+
+
+test3<- glmer(YE_pairs ~ BeachArea_km + Length_km + tot_area_km_Beach + developedLand + Management + Region + Year + (1|BeachID), data = mod_data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+
+summary(test) 
+summary(test2)
+summary(test3)
+
+```
+
+```{r productivity models}
+hist(beachData$Productivity)
+mean(beachData$Productivity, na.rm = TRUE) #0.749
+var(beachData$Productivity, na.rm = TRUE) #1.537
+
+hist(log10(beachData$Productivity))
+
+#can't use poisson distributions because they're non-integer values
+```
+
+
+

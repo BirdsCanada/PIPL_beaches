@@ -19,6 +19,57 @@ To Do:
 
 
 percentage of the landuse categories is based off land area present within the buffer, not including ocean or water bodies within.
+
+
+```{r big dataset}
+beachPhysW<-beachPhys %>% 
+  pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
+  select(-12,-17,-19,-22)
+
+beachData<-full_join(prodData, beachPhysW[,c(1:7,9,16:18)], by = c('BeachID')) %>% 
+  distinct() %>% #keeps only percentage for landuse and total_km for 2km beach buffer
+  rename(Length_km = Length_km.y, Region = Region.y) %>% 
+  select(-Length_km.x, -Region.x)
+
+
+x<-piplSurvey %>% 
+  summarise_all(funs(sum(is.na(.))))%>%
+  pivot_longer(!BeachID, names_to = "variable", values_to = "count_na") %>% 
+  select(2:3)
+
+x %>% 
+  filter(count_na < 1000)
+
+#sums numeric columns to look for columns with 0 sum (no observations)
+#need to code columns to numeric if I need this again
+#piplSurvey %>% summarise_if(is.numeric, sum, na.rm = TRUE) %>% pivot_longer(!year, names_to = "variable", values_to = "count_na") %>% select(2:3)
+```
+
+
+```{r prep for models}
+mod_data<-beachData %>% 
+  filter(!is.na(YE_pairs)) #removes a few empty obs
+mod_data$County<-as.factor(mod_data$County)
+mod_data$Region<-as.factor(mod_data$Region)
+mod_data$Year<-as.factor(mod_data$Year)
+mod_data$BeachID<-as.factor(mod_data$BeachID)
+
+#rescale BeachArea
+mod_data$BeachArea_km<-mod_data$BeachArea/1000000
+
+#format Management so it can be used more clearly
+mod_data$Management_raw<-mod_data$Management #don't lose the OG
+mod_data$Management<-as.factor(ifelse(grepl(",", mod_data$Management_raw), "Mixed", mod_data$Management_raw))
+
+#one developed landuse variable for simplicity
+mod_data$developedLand<-mod_data$percentage_Agriculture + mod_data$percentage_Urban + mod_data$percentage_Road
+
+```
+
+### Exploration
+I messed around with prcomp but I'm getting an error about missing/infinite values even when omitting NAs, which reminded me nmds with bray curtis is better for null values which we have
+nmds isn't really suitable for large datasets though, so I'm moving on to other exploration/model prep
+
 ```{r landuse plots}
 ggplot(beachPhys, aes(tot_area_km, color = landclass))+ geom_histogram()+facet_wrap(~landclass, scales = "free")
 
@@ -26,49 +77,31 @@ ggplot(beachPhys, aes(landclass, tot_area_km, colour = landclass))+ geom_boxplot
 ```
 
 
-```{r big dataset}
-#Need to fix goose haven in this dataset
-beachPhysW<-beachPhys %>% 
-  pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
-  select(-12,-17,-19,-22)
+```{r exploration}
 
-beachData<-full_join(prodData, beachPhysW, by = c('BeachID', 'Length_km', 'Region')) %>% 
-  distinct()
+# count data so it isn't surprising we have left skew, probably poisson dist.
+lapply(prodData[,c(4:8)], FUN = hist)
+lapply(piplSurvey[,c(11:13,15:16)], FUN = hist) # pipl presence histos
+lapply(piplSurvey[,c()], FUN = hist)
+lapply(beachPhysW[,c(3,7:18)], FUN = hist) #length and land buffer area are normal-ish, all others have left skew
 
-#this may not be very useful
-data<-full_join((piplSurvey %>% 
-  select(name,year:day,19, 31:63) %>% 
-  rename(BeachID = name, Year = year)), beachData,  by = c('BeachID', 'Year'))
-
-data[data == ""] <- NA #just fixing missing values formatting
-
-```
-
-
-I messed around with prcomp but I'm getting an error about missing/infinite values even when omitting NAs, which reminded me nmds with bray curtis is better for null values which we have
-```{r nmds?}
-library(vegan)
-#change columns to numeric if going into a pca
-cols.num <- c(2,5:38,40:45,47:49,51:62)
-data[cols.num] <- sapply(data[cols.num],as.numeric)
-
-data_mat<-data %>% 
-  select(c(2,5:38,40:45,47:49,51:62)) %>% 
-  filter_all(any_vars(. != 0))
-#NEED to sum columns to look for only 0 columns
-data %>% 
-  select(c(2,5:38,40:45,47:49,51:62)) %>% 
-  filter_all(any_vars(. != 0))
-
-metaMDS(data_mat, k = 2, na.rm = TRUE, distance="bray")
-
-test<-data %>% 
+#assessing which beaches have no pairs ever according to our data (prodData is CWS data)
+# I could make this into a list for running analyses without these no pipl beaches
+prodData %>% 
   group_by(BeachID) %>% 
-  summarize(sum = sum(is.na(Management)))
-test2<-data %>% 
-  select(1, 50)
+  summarize(pairs = sum(YE_pairs), present = (sum(YE_pairs > 0)), total = n(), ratio = (sum(YE_pairs > 0)/n())) 
+# 17 beaches with no pairs
+# 11 beaches always have pairs, another 6 are 80% or above
+
 ```
 
+
+```{r boxplots}
+boxplot(beachData[,c(5,8)]) #pairs has outliers, mostly crows neck
+boxplot(beachData[,c(24:26)]) #some outliers in road and urban (probably near halifax?)
+
+ggplot(data = beachData, aes())
+```
 
 
 
