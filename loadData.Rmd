@@ -514,8 +514,13 @@ parking<-y %>%
 
 transects<-full_join(transects, parking)
 
-density %>% 
-  
+density<-density %>% 
+  select(Name, bufferPop_km2) %>% 
+  rename(BeachID = Name)
+
+density<-QGIS_names(density)
+
+transects<-full_join(transects, density, by = 'BeachID')
 
 beachPhys<-full_join(beachPhys, transects, by = 'BeachID')
 beachPhys<-full_join(beachPhys, development, by = 'BeachID') %>% 
