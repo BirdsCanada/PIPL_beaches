@@ -102,6 +102,14 @@ beachuse<-read.csv(file = '../Data/beach_intersection.csv') %>%
   select_if(all_na) %>% 
   select(1:2,58:59,64) %>% 
   rename(BeachID = Name, Description = descriptio, beach_area = union_area)
+
+development<-read.csv(file = '../Data/beach_development.csv')
+
+transects<-read.csv(file = '../Data/transect_lengths.csv')
+
+parking<-read.csv(file = '../Data/parking.csv')
+
+density<-read.csv(file = '../Data/pipl_density3.csv')
 ```
 
 Cleaning and Reformatting
@@ -362,7 +370,6 @@ prodData$temp<-NULL
 adding beach length (from BRC data) and area (google earth beach polygons)
 *will add parking lot size and number information when available*
 ```{r physical beach data clean}
-beachLength
 prodData<-left_join(prodData, beachLength, by = 'BeachID')
 
 prodData %>% 
@@ -450,6 +457,71 @@ beachPhys<- beachPhys %>%
   filter(!BeachID == "Port Joli (Goose Haven)")
 ```
 
+```{r Beach Width, development, and parking}
+#first fix the QGIS dataset names
+transects<-QGIS_names(transects[,2:22])
+setdiff(transects$Name, beachnames)
+
+#we created several transects (250m apart) along each beach, I'll average this and get a beach width
+transects<-transects %>% 
+  rename(BeachID = Name) %>% 
+  group_by(BeachID) %>% 
+  summarize(beach_width = mean(TR_LENGTH), beach_width_sd = sd(TR_LENGTH))
+
+#parking lots
+x<-subset(parking,grepl("^.+( A| B| C| D| E| F| G| H)$",Name))
+x$Name<-substr(x$Name,1,nchar(x$Name)-2)
+y<-subset(parking,!grepl("^.+( A| B| C| D| E| F| G| H)$",Name))
+parking<-rbind(x,y) %>% 
+  arrange(Name) %>% 
+  rename(BeachID = Name) %>% 
+  select(BeachID, parkArea)
+
+parking$BeachID<-substr(parking$BeachID,1,nchar(parking$BeachID)-8)
+
+#still too many small spelling mistakes, used a fuzzy join (did a test to ensure correct pairs)
+x<-as.data.frame(parking$BeachID) %>% 
+  rename(BeachID = 1)
+y<-as.data.frame(beachnames) %>% 
+  rename(BeachID = 1)
+
+x<-stringdist_join(x, y, 
+                by = "BeachID",
+                mode = "left",
+                ignore_case = FALSE, 
+                method = "jw", 
+                max_dist = 99, 
+                distance_col = "dist") %>%
+  group_by(BeachID.x) %>%
+  slice_min(order_by = dist, n = 1) %>% 
+  unique
+
+colnames(x)<-c("BeachID", "correction", "dist")
+
+#manually reassigning mismatches for fuzzy
+x[x$BeachID == "Keji NP", 2]<- "St. Catherines River, Keji NP Seaside"
+x[x$BeachID == "Crescent Beach", 2]<- "Crescent (Shelburne Co.)"
+
+y<-left_join(parking, x, by = 'BeachID') %>% 
+  rename(BeachID_original = BeachID, BeachID = correction) %>% 
+  select(BeachID, parkArea)
+
+setdiff(beachPhys$BeachID, beachnames) #all good  
+
+parking<-y %>% 
+  group_by(BeachID) %>% 
+  summarize(parkArea = sum(parkArea))
+
+transects<-full_join(transects, parking)
+
+density %>% 
+  
+
+beachPhys<-full_join(beachPhys, transects, by = 'BeachID')
+beachPhys<-full_join(beachPhys, development, by = 'BeachID') %>% 
+  select(-Notes)
+```
+
 
 ## End
 
@@ -469,6 +541,9 @@ pipl2014<-NULL
 pipl2015<-NULL
 pipl2016<-NULL
 buffer_area<-NULL
+transects<-NULL
+parking<-NULL
+development<-NULL
 ```
 
 ## End

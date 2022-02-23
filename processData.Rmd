@@ -9,24 +9,23 @@ library(tidyverse)
 ```
 
 To Do:
--get a number for each beach that shows the amount of land within the buffer (exclude sea)
+-get a number for each beach that shows the amount of land within the buffer (exclude sea) (DONE)
 -finalize buffer size
--process landuse data
--reformat with physical data
+-process landuse data (DONE)
+-reformat with physical data (DONE)
 -process survey data into format for analysis
 -visualize
--pca of survey variables
+-pca of survey variables (not doing)
 
 
 percentage of the landuse categories is based off land area present within the buffer, not including ocean or water bodies within.
 
-
 ```{r big dataset}
 beachPhysW<-beachPhys %>% 
   pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
-  select(-12,-17,-19,-22)
+  select(-18,-23,-25,-28)
 
-beachData<-full_join(prodData, beachPhysW[,c(1:7,9,16:18)], by = c('BeachID')) %>% 
+beachData<-full_join(prodData, beachPhysW[,c(1:6,8,10:13,15,22:24)], by = c('BeachID')) %>% 
   distinct() %>% #keeps only percentage for landuse and total_km for 2km beach buffer
   rename(Length_km = Length_km.y, Region = Region.y) %>% 
   select(-Length_km.x, -Region.x)
@@ -39,32 +38,15 @@ x<-piplSurvey %>%
 
 x %>% 
   filter(count_na < 1000)
-
-#sums numeric columns to look for columns with 0 sum (no observations)
-#need to code columns to numeric if I need this again
-#piplSurvey %>% summarise_if(is.numeric, sum, na.rm = TRUE) %>% pivot_longer(!year, names_to = "variable", values_to = "count_na") %>% select(2:3)
 ```
+Based on the above I think the main variables to include are:
+dogs_leashedStart & dogs_unleashedStart (20,21)
+signs_small & signs_large (25,26)
+fencedNests & vehicles & litter (28,37,39)
+engagedPeople & engagedPeople_dogs (33,34)
+peopleTotal & dogs_leashedTotal & dogs_unleashedTotal (40,41,42)
 
-
-```{r prep for models}
-mod_data<-beachData %>% 
-  filter(!is.na(YE_pairs)) #removes a few empty obs
-mod_data$County<-as.factor(mod_data$County)
-mod_data$Region<-as.factor(mod_data$Region)
-mod_data$Year<-as.factor(mod_data$Year)
-mod_data$BeachID<-as.factor(mod_data$BeachID)
-
-#rescale BeachArea
-mod_data$BeachArea_km<-mod_data$BeachArea/1000000
-
-#format Management so it can be used more clearly
-mod_data$Management_raw<-mod_data$Management #don't lose the OG
-mod_data$Management<-as.factor(ifelse(grepl(",", mod_data$Management_raw), "Mixed", mod_data$Management_raw))
-
-#one developed landuse variable for simplicity
-mod_data$developedLand<-mod_data$percentage_Agriculture + mod_data$percentage_Urban + mod_data$percentage_Road
-
-```
+columns: c(20:21,25:26,28,33:34,37,39:42)
 
 ### Exploration
 I messed around with prcomp but I'm getting an error about missing/infinite values even when omitting NAs, which reminded me nmds with bray curtis is better for null values which we have
@@ -78,12 +60,12 @@ ggplot(beachPhys, aes(landclass, tot_area_km, colour = landclass))+ geom_boxplot
 
 
 ```{r exploration}
-
+piplSurvey[,c(18:21,25:26,28,33:34,37,39:42)]<-sapply(piplSurvey[,c(18:21,25:26,28,33:34,37,39:42)],as.numeric)
 # count data so it isn't surprising we have left skew, probably poisson dist.
 lapply(prodData[,c(4:8)], FUN = hist)
 lapply(piplSurvey[,c(11:13,15:16)], FUN = hist) # pipl presence histos
-lapply(piplSurvey[,c()], FUN = hist)
-lapply(beachPhysW[,c(3,7:18)], FUN = hist) #length and land buffer area are normal-ish, all others have left skew
+lapply(piplSurvey[,c(20:21,25:26,28,33:34,37,39:42)], FUN = hist) #survey variables we want to include
+lapply(beachPhysW[,c(3,7:21)], FUN = hist) #length and land buffer area are normal-ish, all others have left skew
 
 #assessing which beaches have no pairs ever according to our data (prodData is CWS data)
 # I could make this into a list for running analyses without these no pipl beaches
@@ -96,18 +78,104 @@ prodData %>%
 ```
 
 
-```{r boxplots}
+```{r breeding boxplots}
 boxplot(beachData[,c(5,8)]) #pairs has outliers, mostly crows neck
 boxplot(beachData[,c(24:26)]) #some outliers in road and urban (probably near halifax?)
+```
 
-ggplot(data = beachData, aes())
+*Variables kept for possible inclusion in human models*
+-dogs_leashedStart & dogs_unleashedStart (20,21)
+-signs_small & signs_large (25,26)
+-fencedNests & vehicles & litter (28,37,39)
+-engagedPeople & engagedPeople_dogs (33,34)
+-peopleTotal & dogs_leashedTotal & dogs_unleashedTotal (40,41,42)
+
+Create a categorical variable for models to summarize multiple survey results
+Using BRC class thresholds (notes in obsidian and in code)
+```{r binning survey data}
+#variables that have enough entries and are relevant
+surveyVar<-c("dogs_leashedStart", "dogs_unleashedStart", "signs_small", "signs_large", "fencedNests", "vehicles","litter", "engagedPeople", "engagedPeople_dogs","peopleTotal","dogs_leashedTotal", "dogs_unleashedTotal","dogs_all")
+
+piplSurvey$dogs_leashedTotal<-as.numeric(piplSurvey$dogs_leashedTotal)
+piplSurvey$dogs_unleashedTotal<-as.numeric(piplSurvey$dogs_unleashedTotal)
+
+piplSurvey$dogs_all<-ifelse((is.na(piplSurvey$dogs_unleashedTotal)&is.na(piplSurvey$dogs_leashedTotal)), NA, rowSums(piplSurvey[,c("dogs_leashedTotal", "dogs_unleashedTotal")], na.rm=TRUE))
+
+#group by survey year
+BRC_survey<- piplSurvey %>% 
+  select(c(BeachID, year) | one_of(surveyVar)) %>% 
+  mutate(across(one_of(surveyVar), as.numeric)) %>% 
+  group_by(BeachID, year) %>% 
+  summarize(across(c(one_of(surveyVar)), ~ mean(.x, na.rm = TRUE))) %>% 
+  rename(Year = year)
+
+#remove beaches with less than 4 surveys 
+summary(as.factor(BRC_survey$BeachID))
+lessSurvey<-c("Cranberry Pond","Green Bay", "Harbour Breeze, Port Joli", "Hawk Point & The Hawk", "Dominion (Lingan)", "Round Bay", "Roseway", "Stoney (Lawrencetown Head)", "Bowen Island", "Goose & Burks Point", "Goose and Burks Point")
+
+BRC_survey<-BRC_survey %>% 
+  filter(!BeachID %in% lessSurvey)
+
+#with BRC classifications
+BRC_survey$vehicles_ind<-ifelse(BRC_survey$vehicles>0.5, "poor", ifelse(
+  BRC_survey$vehicles==0, "great", "fair"))
+BRC_survey$offleash_ind<-ifelse(BRC_survey$dogs_unleashedTotal>1, "poor", ifelse(
+  BRC_survey$dogs_unleashedTotal==0, "great", "fair"))
+
+#add length column from beachPhys to calculate beachgoer intensity, create total dogs (sum off and on leash total) for percent off leash
+BRC_survey$dogs_leashedPercent<-ifelse(
+  is.na(BRC_survey$dogs_leashedTotal), NA, BRC_survey$dogs_leashedTotal/BRC_survey$dogs_all)
+BRC_survey$dogRespect_ind<-ifelse(BRC_survey$dogs_leashedPercent<.5, "poor", ifelse(
+  BRC_survey$dogs_leashedPercent>.80, "great", "fair")) #NOTE: I changed this from >1 (in BRC) to >.8 for great
+
+BRC_survey<-left_join(BRC_survey, beachPhysW[,c(1,3)], by = 'BeachID')
+BRC_survey$peopleIntensity<-BRC_survey$peopleTotal/BRC_survey$Length_km
+BRC_survey$intensity_ind<-ifelse(BRC_survey$peopleIntensity>5, "poor", ifelse(
+  BRC_survey$peopleIntensity<2, "great", "fair"))
+
+BRC_survey[is.na(BRC_survey)]<-NA #changing all NaN to NA
+```
+
+### Model dfs
+
+two models
+one is year specific with human variables (survey data)
+  -use the CWS pipl productivity as response variable
+  -only include beaches surveyed sufficiently
+one is beach specific and has all physical data (beach characteristics, landuse etc)
+  -use total breeding pairs over surveyed period?
+  -include more beaches? (as long as we have the CWS and phys data)
+
+Maybe a model with only beaches that have pipl?
+  - using relevant factors as informed by the other two models?
+
+```{r prep for models}
+mod_phys<-beachData %>% 
+  filter(!is.na(YE_pairs)) #removes a few empty obs
+mod_phys$County<-as.factor(mod_phys$County)
+mod_phys$Region<-as.factor(mod_phys$Region)
+mod_phys$Year<-as.factor(mod_phys$Year)
+mod_phys$BeachID<-as.factor(mod_phys$BeachID)
+
+#rescale BeachArea
+mod_phys$BeachArea_km<-mod_phys$BeachArea/1000000
+
+#format Management so it can be used more clearly
+mod_phys$Management_raw<-mod_phys$Management #don't lose the OG
+mod_phys$Management<-as.factor(ifelse(grepl(",", mod_phys$Management_raw), "Mixed", mod_phys$Management_raw))
+
+#one developed landuse variable for simplicity
+mod_phys$developedLand<-mod_phys$percentage_Agriculture + mod_phys$percentage_Urban + mod_phys$percentage_Road
 ```
 
 
+```{r prep for human model}
+prodData$Year<-as.character(prodData$Year)
+mod_human<-left_join(BRC_survey, prodData[,1:9])
+```
 
 
-
-
+### End
 
 
 
