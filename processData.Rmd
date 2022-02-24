@@ -13,7 +13,7 @@ To Do:
 -finalize buffer size
 -process landuse data (DONE)
 -reformat with physical data (DONE)
--process survey data into format for analysis
+-process survey data into format for analysis (DONE)
 -visualize
 -pca of survey variables (not doing)
 
@@ -23,13 +23,41 @@ percentage of the landuse categories is based off land area present within the b
 ```{r big dataset}
 beachPhysW<-beachPhys %>% 
   pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
-  select(-18,-23,-25,-28)
+  select(-19,-24,-26,-29)
 
-beachData<-full_join(prodData, beachPhysW[,c(1:6,8,10:13,15,22:24)], by = c('BeachID')) %>% 
+#James Beach and Bowen island were surveyed separately 2012-2016 (Bowen island had no pairs) Remove Bowen island and rename James as James and Bowen Island
+#Same thing is true with Goose and Burks Point (Burks has no pairs prior to the joining of the sites in 2017)
+#I summed the coastlines as well for goose and burks since there was no coastline measurement
+prodData<-prodData %>%
+  filter(!BeachID == "Burks Point") %>% 
+  mutate(BeachID = replace(BeachID, BeachID == "Goose (Indian) Point", "Goose and Burks Point")) %>% 
+  filter(!BeachID == "Bowen Island") %>% 
+  mutate(BeachID = replace(BeachID, BeachID == "James", "James & Bowen Island")) %>% 
+  group_by(BeachID) %>% 
+  fill(c(Region), .direction = "downup") %>% #fill in region gaps
+  ungroup() %>% 
+  mutate(Length_km = replace(Length_km, BeachID == "Goose and Burks Point", 2.1)) #Goose pt = .7 Burks = 1.4, 2.1 total
+
+#filling in Goose and Burks point before joining, for most variables I will use the goose Point data (urban land, pop dens etc)
+x<-beachPhysW[beachPhysW$BeachID == "Goose (Indian) Point",]
+x$BeachArea<-54166+53745 #sum of both beaches
+x$Length_km<-1.4+.7 #sum of coastlines from both
+x$beach_width<-beachPhysW$beach_width[which(beachPhysW$BeachID == "Goose and Burks Point")]
+x$beach_width_sd<-beachPhysW$beach_width_sd[which(beachPhysW$BeachID == "Goose and Burks Point")]
+x$BeachID<-"Goose and Burks Point"
+
+beachPhysW<-beachPhysW %>% 
+  filter(!BeachID == "Goose and Burks Point")
+
+beachPhysW<-rbind(beachPhysW, x)
+
+
+beachData<-full_join(prodData, beachPhysW[,c(1:6,8,10:14,16,23:25)], by = c('BeachID')) %>% 
   distinct() %>% #keeps only percentage for landuse and total_km for 2km beach buffer
   rename(Length_km = Length_km.y, Region = Region.y) %>% 
-  select(-Length_km.x, -Region.x)
-
+  select(-Length_km.x, -Region.x) %>% 
+  mutate(beach_width = replace(beach_width, BeachID == "James & Bowen Island", beachPhysW$beach_width[beachPhysW$BeachID== "James"]))  # the only missing value between the grouped and alone beaches
+ 
 
 x<-piplSurvey %>% 
   summarise_all(funs(sum(is.na(.))))%>%
@@ -83,6 +111,39 @@ boxplot(beachData[,c(5,8)]) #pairs has outliers, mostly crows neck
 boxplot(beachData[,c(24:26)]) #some outliers in road and urban (probably near halifax?)
 ```
 
+
+### Model dfs
+
+two models
+one is year specific with human variables (survey data)
+  -use the CWS pipl productivity as response variable
+  -only include beaches surveyed sufficiently
+one is beach specific and has all physical data (beach characteristics, landuse etc)
+  -use total breeding pairs over surveyed period?
+  -include more beaches? (as long as we have the CWS and phys data)
+
+Maybe a model with only beaches that have pipl?
+  - using relevant factors as informed by the other two models?
+
+```{r prep for models}
+mod_phys<-beachData %>% 
+  filter(!is.na(YE_pairs)) #removes a few empty obs
+mod_phys$County<-as.factor(mod_phys$County)
+mod_phys$Region<-as.factor(mod_phys$Region)
+mod_phys$Year<-as.factor(mod_phys$Year)
+mod_phys$BeachID<-as.factor(mod_phys$BeachID)
+
+#rescale BeachArea
+mod_phys$BeachArea_km<-mod_phys$BeachArea/1000000
+
+#format Management so it can be used more clearly
+mod_phys$Management_raw<-mod_phys$Management #don't lose the OG
+mod_phys$Management<-as.factor(ifelse(grepl(",", mod_phys$Management_raw), "Mixed", mod_phys$Management_raw))
+
+#one developed landuse variable for simplicity
+mod_phys$developedLand<-mod_phys$percentage_Agriculture + mod_phys$percentage_Urban + mod_phys$percentage_Road
+```
+
 *Variables kept for possible inclusion in human models*
 -dogs_leashedStart & dogs_unleashedStart (20,21)
 -signs_small & signs_large (25,26)
@@ -92,6 +153,7 @@ boxplot(beachData[,c(24:26)]) #some outliers in road and urban (probably near ha
 
 Create a categorical variable for models to summarize multiple survey results
 Using BRC class thresholds (notes in obsidian and in code)
+
 ```{r binning survey data}
 #variables that have enough entries and are relevant
 surveyVar<-c("dogs_leashedStart", "dogs_unleashedStart", "signs_small", "signs_large", "fencedNests", "vehicles","litter", "engagedPeople", "engagedPeople_dogs","peopleTotal","dogs_leashedTotal", "dogs_unleashedTotal","dogs_all")
@@ -134,38 +196,6 @@ BRC_survey$intensity_ind<-ifelse(BRC_survey$peopleIntensity>5, "poor", ifelse(
   BRC_survey$peopleIntensity<2, "great", "fair"))
 
 BRC_survey[is.na(BRC_survey)]<-NA #changing all NaN to NA
-```
-
-### Model dfs
-
-two models
-one is year specific with human variables (survey data)
-  -use the CWS pipl productivity as response variable
-  -only include beaches surveyed sufficiently
-one is beach specific and has all physical data (beach characteristics, landuse etc)
-  -use total breeding pairs over surveyed period?
-  -include more beaches? (as long as we have the CWS and phys data)
-
-Maybe a model with only beaches that have pipl?
-  - using relevant factors as informed by the other two models?
-
-```{r prep for models}
-mod_phys<-beachData %>% 
-  filter(!is.na(YE_pairs)) #removes a few empty obs
-mod_phys$County<-as.factor(mod_phys$County)
-mod_phys$Region<-as.factor(mod_phys$Region)
-mod_phys$Year<-as.factor(mod_phys$Year)
-mod_phys$BeachID<-as.factor(mod_phys$BeachID)
-
-#rescale BeachArea
-mod_phys$BeachArea_km<-mod_phys$BeachArea/1000000
-
-#format Management so it can be used more clearly
-mod_phys$Management_raw<-mod_phys$Management #don't lose the OG
-mod_phys$Management<-as.factor(ifelse(grepl(",", mod_phys$Management_raw), "Mixed", mod_phys$Management_raw))
-
-#one developed landuse variable for simplicity
-mod_phys$developedLand<-mod_phys$percentage_Agriculture + mod_phys$percentage_Urban + mod_phys$percentage_Road
 ```
 
 

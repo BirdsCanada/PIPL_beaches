@@ -62,7 +62,7 @@ pipl2015<-read.csv(file = '../Data/SWNS_2015.csv')
 pipl2016<-read.csv(file = '../Data/SWNS_2016.csv')
 
 # survey data for Northern NS for 2014-2016 BRC
-#pipl_NNS<-read.csv(file = '../Data/NNS_ReportCard_rawdata.csv')
+pipl_NNS<-read.csv(file = '../Data/NNS_ReportCard_rawdata.csv')
 
 #Here I load and clean the productivity data from 2012-2021 surveys
 brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
@@ -227,9 +227,9 @@ piplSurvey$BeachID %<>%
   gsub("'", "", .)
 
 #this doesn't match properly in fuzzy join so manually reassigning
-piplSurvey[piplSurvey$BeachID == "Silver Sands (Cow Bay)",]<- "Cow Bay"
-piplSurvey[piplSurvey$BeachID == "Stoney Beach",]<- "Stoney (Lawrencetown Head)"
-piplSurvey[piplSurvey$BeachID == "Lawrencetown Beach",]<- "Stoney (Lawrencetown Head)"
+piplSurvey[piplSurvey$BeachID == "Silver Sands (Cow Bay)", "BeachID"]<- "Cow Bay"
+piplSurvey[piplSurvey$BeachID == "Stoney Beach", "BeachID"]<- "Stoney (Lawrencetown Head)"
+piplSurvey[piplSurvey$BeachID == "Lawrencetown Beach", "BeachID"]<- "Stoney (Lawrencetown Head)"
 
 #removing beaches not on the list
 WrongBeaches<-c("Maughers Beach", "MacCormacks Beach", "Point Michaud", "Keating Cove", "Purgatory Point")
@@ -462,6 +462,13 @@ beachPhys<- beachPhys %>%
 transects<-QGIS_names(transects[,2:22])
 setdiff(transects$Name, beachnames)
 
+y<-transects %>% 
+  filter(Name %in% c("Goose (Indian) Point","Burks Point", "Goose and Burks Point")) 
+
+y$Name<-"Goose and Burks Point"
+
+transects<-rbind(y, transects)%>% 
+  mutate(BeachArea = replace(BeachArea, Name == "Goose and Burks Point", (54166+53745))) #joining area of both
 #we created several transects (250m apart) along each beach, I'll average this and get a beach width
 transects<-transects %>% 
   rename(BeachID = Name) %>% 
@@ -523,6 +530,8 @@ density<-QGIS_names(density)
 transects<-full_join(transects, density, by = 'BeachID')
 
 beachPhys<-full_join(beachPhys, transects, by = 'BeachID')
+
+
 beachPhys<-full_join(beachPhys, development, by = 'BeachID') %>% 
   select(-Notes)
 ```
@@ -549,6 +558,7 @@ buffer_area<-NULL
 transects<-NULL
 parking<-NULL
 development<-NULL
+density<-NULL
 ```
 
 ## End
