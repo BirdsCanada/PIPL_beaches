@@ -36,20 +36,19 @@ Overall model
 ## Models
 So far beach area and foraging area are potentially significant
 no validation has occurred, restart model selection top down approach (zuur)
-### Physical Models
+### Spatial Models
 ```{r poisson regression}
-hist(beachData$YE_pairs)
-mean(beachData$YE_pairs, na.rm = TRUE) #0.782
-var(beachData$YE_pairs, na.rm = TRUE) #1.668
-
-#all 3 have a warning about diff scalings (from scalecheck() in optimx pkg), validate to assess
-test<- glmer(YE_pairs ~ BeachArea_km + Length_km + tot_area_km_Beach + developedLand + Management + Year + (1|BeachID), data = mod_data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-
-#no convergence:  degenerate  Hessian with 1 negative eigenvalues
-test2<- glmer(YE_pairs ~ BeachArea_km + Length_km + tot_area_km_Beach + developedLand + Management + County + Year + (1|BeachID), data = mod_data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+hist(mod_phys$max_BP)
+mean(mod_phys$max_BP, na.rm = TRUE) #1.559
+var(mod_phys$max_BP, na.rm = TRUE) #3.044
 
 
-test3<- glmer(YE_pairs ~ BeachArea_km + Length_km + tot_area_km_Beach + developedLand + Management + Region + Year + (1|BeachID), data = mod_data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+test<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+
+test2<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+
+
+test3<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
 
 summary(test) 
 summary(test2) #lowest AIC but convergence error
@@ -71,9 +70,63 @@ hist(log10(beachData$Productivity))
 
 ### Human Model
 
-```{r}
+fitted following Zuur (2009) method
 
+
+```{r random factor selection}
+#rescale numerical variables
+numcols<-which(sapply(mod_human[,1:23], is.numeric)) #don't rescale response variables for the poisson distribution (no neatives)
+mod_humanSc<-mod_human
+mod_humanSc[,numcols] <- scale(mod_humanSc[,numcols])
+
+#assess random factor structure first
+rand_test<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests + (1|Year) + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#singular
+all_fit(rand_test)
+
+rand_test2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests +  (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#unable to evaluate scaled gradient Hessian is numerically singular: parameters are not uniquely determined
+
+rand_test3<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests +  (1|Year), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#convergence code 1 from optimx: noneParameters or bounds appear to have different scalings.
+#also singular
+
+
+#compare AIC values to pick random structure
+summary(rand_test2) #472.5
+summary(rand_test2) #472.5
+summary(rand_test3) #513.2
 ```
 
+```{r fixed factor selection}
+library("numDeriv")
+library("reshape2")
+library("afex")
+
+mod<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(mod)
+
+tt <- getME(mod,"theta")
+ll <- getME(mod,"lower")
+min(tt[ll==0]) #def singular
+
+#checking gradient calculations
+derivs1 <- mod_sc@optinfo$derivs
+sc_grad1 <- with(derivs1,solve(Hessian,gradient))
+max(abs(sc_grad1))
+
+max(pmin(abs(sc_grad1),abs(derivs1$gradient))) #below the tolerance of .001 so this is good!
+
+#more iterations?
+ss <- getME(mod_sc,c("theta","fixef"))
+mod2 <- update(mod_sc,start=ss,control=glmerControl(optCtrl=list(maxfun=2e4))) #still singular
+
+#different optimizer?
+test_mod<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests + (1|Year) + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"))
+#all the optimizers
+test<-all_fit(test_mod) #all singular
+
+
+```
 
 

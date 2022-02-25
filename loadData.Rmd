@@ -62,7 +62,7 @@ pipl2015<-read.csv(file = '../Data/SWNS_2015.csv')
 pipl2016<-read.csv(file = '../Data/SWNS_2016.csv')
 
 # survey data for Northern NS for 2014-2016 BRC
-pipl_NNS<-read.csv(file = '../Data/NNS_ReportCard_rawdata.csv')
+#pipl_NNS<-read.csv(file = '../Data/NNS_ReportCard_rawdata.csv')
 
 #Here I load and clean the productivity data from 2012-2021 surveys
 brc1<-read.csv(file = '../Data/Summary of Biological Outcomes 2012-2016.csv') #saved sheet 1 (all years)
@@ -85,10 +85,16 @@ beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point
 #James and Bowen Island are sometimes apart, others are from BRC
 
 #landuse intersection data, read in and select relevant columns (non-forestry related)
+#landuse_old<-read.csv(file = '../Data/landuse_intersection_old.csv') %>% 
+  #select(1:21,38,54:56,67:70,73) %>% 
+  #select_if(all_na)%>% 
+  #rename(Description = descriptio, BeachID = Name)
+#landuse_old<-QGIS_names(landuse_old)
+
 landuse<-read.csv(file = '../Data/landuse_intersection.csv') %>% 
-  select(1:21,38,54:56,67:70,73) %>% 
+  select(1:21,36,52:54,64:67,72) %>% 
   select_if(all_na)%>% 
-  rename(Description = descriptio, BeachID = Name)
+  rename(Description = descriptio, BeachID = Name, Int_Area = Int_Area2)
 landuse<-QGIS_names(landuse)
 
 #buffer area (only the intersection of the buffer and NS land area)
@@ -99,16 +105,20 @@ buffer_area<-QGIS_names(buffer_area)
 
 #beachuse is all beach landuse polygons in a 2km buffer (foraging)
 beachuse<-read.csv(file = '../Data/beach_intersection.csv') %>% 
+  select(1:2,72:73,85) %>%
   select_if(all_na) %>% 
-  select(1:2,58:59,64) %>% 
   rename(BeachID = Name, Description = descriptio, beach_area = union_area)
 
+#information on paths, parking presence, and how much of beach is bordered by road
 development<-read.csv(file = '../Data/beach_development.csv')
 
+#beach width, calculated with transcets in QGIS
 transects<-read.csv(file = '../Data/transect_lengths.csv')
 
+#digitized parking lot areas
 parking<-read.csv(file = '../Data/parking.csv')
 
+#pop density from google earth engine
 density<-read.csv(file = '../Data/pipl_density3.csv')
 ```
 
@@ -367,7 +377,7 @@ prodData$temp<-NULL
 ```
 
 ### Physical Beach Data (Area and Length)
-adding beach length (from BRC data) and area (google earth beach polygons)
+adding beach length (from BRC data) and area (google earth beach polygons) and other spatial variables
 *will add parking lot size and number information when available*
 ```{r physical beach data clean}
 prodData<-left_join(prodData, beachLength, by = 'BeachID')
@@ -413,8 +423,7 @@ beachPhys$Management<-ifelse(beachPhys$BeachID %in% c("Taylor Head Bay", "Hirtle
 #creating a new variable with the landuse assignments
 landuse<-landuse %>% 
   mutate(landclass = ifelse(landuse$FORNON == 87, "Urban", ifelse(
-    landuse$FORNON == 86, "Agriculture", ifelse(
-    landuse$FORNON == 94, "Beach", "Road"))))
+    landuse$FORNON == 86, "Agriculture", "Road")))
 
 #fixing beachuse, qgis union created two sets of columns I need to fill one and keep it
 beachuse[beachuse == ""] <- NA
@@ -443,11 +452,15 @@ y<-y %>%
   mutate(temp = paste(BeachID, "_Beach", sep =""))
 
 x<-full_join(x,y, by = c('temp', 'BeachID'))
-x$tot_area<-ifelse(x$landclass =='Beach', x$tot_area_beach, x$tot_area)
-x$tot_area_km<-ifelse(x$landclass =='Beach', x$tot_area_beach_km, x$tot_area_km)  
-x$percentage<-ifelse(x$landclass =='Beach', NA, x$percentage)
+x$tot_area<-ifelse(is.na(x$landclass), x$tot_area_beach, x$tot_area)
+x$tot_area_km<-ifelse(is.na(x$landclass), x$tot_area_beach_km, x$tot_area_km)  
+x$percentage<-ifelse(is.na(x$landclass), NA, x$percentage)
+x$landclass<-ifelse(is.na(x$landclass), "Beach", x$landclass)
+x<-x %>% 
+  arrange(BeachID) %>% 
+  fill(land_area)
 
-#join x to BeachPhys, but remove last row adn last 3 columns
+#join x to BeachPhys, but remove last row and last 3 columns
 beachPhys<-full_join(beachPhys, x[,1:6], by = 'BeachID')
 
 # fix goose haven naming, replace region and length with Port Joli (Goose Haven) values and then remove

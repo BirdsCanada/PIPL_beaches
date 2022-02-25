@@ -23,12 +23,12 @@ percentage of the landuse categories is based off land area present within the b
 ```{r big dataset}
 beachPhysW<-beachPhys %>% 
   pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
-  select(-19,-24,-26,-29)
+  select(-19,-24,-28,-29)
 
 #James Beach and Bowen island were surveyed separately 2012-2016 (Bowen island had no pairs) Remove Bowen island and rename James as James and Bowen Island
 #Same thing is true with Goose and Burks Point (Burks has no pairs prior to the joining of the sites in 2017)
 #I summed the coastlines as well for goose and burks since there was no coastline measurement
-prodData<-prodData %>%
+beachProd<-prodData %>%
   filter(!BeachID == "Burks Point") %>% 
   mutate(BeachID = replace(BeachID, BeachID == "Goose (Indian) Point", "Goose and Burks Point")) %>% 
   filter(!BeachID == "Bowen Island") %>% 
@@ -46,13 +46,13 @@ x$beach_width<-beachPhysW$beach_width[which(beachPhysW$BeachID == "Goose and Bur
 x$beach_width_sd<-beachPhysW$beach_width_sd[which(beachPhysW$BeachID == "Goose and Burks Point")]
 x$BeachID<-"Goose and Burks Point"
 
+#remove incomplete entry and join to the complete entry
 beachPhysW<-beachPhysW %>% 
   filter(!BeachID == "Goose and Burks Point")
-
 beachPhysW<-rbind(beachPhysW, x)
 
 
-beachData<-full_join(prodData, beachPhysW[,c(1:6,8,10:14,16,23:25)], by = c('BeachID')) %>% 
+beachData<-full_join(beachProd, beachPhysW[,c(1:6,8,10:14,16,23:25)], by = c('BeachID')) %>% 
   distinct() %>% #keeps only percentage for landuse and total_km for 2km beach buffer
   rename(Length_km = Length_km.y, Region = Region.y) %>% 
   select(-Length_km.x, -Region.x) %>% 
@@ -126,9 +126,30 @@ Maybe a model with only beaches that have pipl?
   - using relevant factors as informed by the other two models?
 
 ```{r prep for models}
-mod_phys<-beachData %>% 
-  filter(!is.na(YE_pairs)) #removes a few empty obs
-mod_phys$County<-as.factor(mod_phys$County)
+x<-prodData %>% 
+  filter(!is.na(YE_pairs)) %>%  #removes a few empty obs
+  group_by(BeachID) %>% 
+  summarize(max_BP = max(YE_pairs), avg_BP = mean(YE_pairs), sum_BP = sum(YE_pairs), avg_productivity = mean(Productivity[which(Productivity>0)]), avg_productivity_all = mean(Productivity[which(!is.na(Productivity))])) #used average without the zeros to show the capacity of the beach when a breeding pair succeeds
+
+mod_phys<-inner_join(beachPhysW, x, by = 'BeachID')
+mod_phys$avg_productivity[which(is.na(mod_phys$avg_productivity))]<-0
+mod_phys$parkArea[which(is.na(mod_phys$parkArea))]<-0
+
+mod_phys<-mod_phys %>% 
+  filter(!BeachID %in% c("James & Bowen Island", "Goose and Burks Point", "Fox Bar")) %>% 
+  mutate(Management = replace(Management, BeachID == "Goose Haven", "Private")) %>% 
+  mutate(BeachArea = replace(BeachArea, BeachID == "Goose Haven", 6171)) %>% 
+  mutate(Border_road = replace(Border_road, BeachID == "James", "part")) %>% 
+  mutate(Border_road = replace(Border_road, BeachID == "Bowen Island", "part")) %>% 
+  mutate(Paths_present = replace(Paths_present, BeachID == "James", "no")) %>% 
+  mutate(Paths_present = replace(Paths_present, BeachID == "Bowen Island", "no")) %>% 
+  mutate(Parking_present = replace(Parking_present, BeachID == "James", "no")) %>% 
+  mutate(Parking_present = replace(Parking_present, BeachID == "Bowen Island", "no")) %>% 
+  select(-c(Description,beach_width_sd))
+
+apply(is.na(mod_phys), 2, which) #all good no NAs
+
+#formatting
 mod_phys$Region<-as.factor(mod_phys$Region)
 mod_phys$Year<-as.factor(mod_phys$Year)
 mod_phys$BeachID<-as.factor(mod_phys$BeachID)
@@ -143,6 +164,7 @@ mod_phys$Management<-as.factor(ifelse(grepl(",", mod_phys$Management_raw), "Mixe
 #one developed landuse variable for simplicity
 mod_phys$developedLand<-mod_phys$percentage_Agriculture + mod_phys$percentage_Urban + mod_phys$percentage_Road
 ```
+
 
 *Variables kept for possible inclusion in human models*
 -dogs_leashedStart & dogs_unleashedStart (20,21)
@@ -201,7 +223,13 @@ BRC_survey[is.na(BRC_survey)]<-NA #changing all NaN to NA
 
 ```{r prep for human model}
 prodData$Year<-as.character(prodData$Year)
+BRC_survey$Year<-as.character(BRC_survey$Year)
+
 mod_human<-left_join(BRC_survey, prodData[,1:9])
+
+mod_human$County<-as.factor(mod_human$County)
+mod_human$BeachID<-as.factor(mod_human$BeachID)
+mod_human$Year<-as.factor(mod_human$Year)
 ```
 
 
