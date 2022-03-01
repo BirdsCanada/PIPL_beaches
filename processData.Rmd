@@ -138,6 +138,7 @@ mod_phys$parkArea[which(is.na(mod_phys$parkArea))]<-0
 mod_phys<-mod_phys %>% 
   filter(!BeachID %in% c("James & Bowen Island", "Goose and Burks Point", "Fox Bar")) %>% 
   mutate(Management = replace(Management, BeachID == "Goose Haven", "Private")) %>% 
+  mutate(Management = replace(Management, BeachID == "Durham Lane, Port Joli", "Mixed")) %>% 
   mutate(BeachArea = replace(BeachArea, BeachID == "Goose Haven", 6171)) %>% 
   mutate(Border_road = replace(Border_road, BeachID == "James", "part")) %>% 
   mutate(Border_road = replace(Border_road, BeachID == "Bowen Island", "part")) %>% 
@@ -230,6 +231,11 @@ mod_human<-left_join(BRC_survey, prodData[,1:9])
 mod_human$County<-as.factor(mod_human$County)
 mod_human$BeachID<-as.factor(mod_human$BeachID)
 mod_human$Year<-as.factor(mod_human$Year)
+
+#complete cases?
+apply(is.na(mod_human), 2, which) 
+#avoid dogs_leashedPercent and dogsRespect_ind and Nestloss_HD because of many missing values
+
 ```
 
 

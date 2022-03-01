@@ -9,6 +9,9 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lme4)
 library(optimx)
+library(DHARMa)
+library(glmmTMB)
+
 ```
 
 ## Stats Plan Ideas/Notes
@@ -42,18 +45,51 @@ hist(mod_phys$max_BP)
 mean(mod_phys$max_BP, na.rm = TRUE) #1.559
 var(mod_phys$max_BP, na.rm = TRUE) #3.044
 
+m1<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"))#likely complete separation (Downdated VtV is not positive definite error) and rescaling needed maybe, complete separation?
+m2<-glm(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + Region, data = mod_phys, family = poisson(link = "log")) # no error
 
-test<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#detect complete seperation?
+#library("brglm2"); glmer(form_rand, data = mod_phys, family = poisson(link = "log"), method="detect_separation")
 
-test2<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(m2) 
+```
+
+```{r model validation}
+
+#model structure max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + Region
+# with DHARMa
+
+simOutput <- simulateResiduals(fittedModel = m2, plot = T)
+#some quantile deviations, fitted value plot n.s. and the effect is quite small, I'm okay with this model (DHARMa documentation)
+
+#for the variables
+plotResiduals(simOutput, form = mod_phys$bufferPop_km2)
+plotResiduals(simOutput, form = mod_phys$parkArea)
+plotResiduals(simOutput, form = mod_phys$BeachArea_km)
+plotResiduals(simOutput, form = mod_phys$beach_width) #quantile deviations, significant, but no patterns just higher than quantile, ok
+plotResiduals(simOutput, form = mod_phys$Length_km)
+plotResiduals(simOutput, form = mod_phys$tot_area_km_Beach) #quantile deviations, significant and with pattern
+plotResiduals(simOutput, form = mod_phys$developedLand) 
 
 
-test3<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#factor variables all n.s. for homogeneity and within group deviation
+plotResiduals(simOutput, form = mod_phys$Management)
+plotResiduals(simOutput, form = mod_phys$Region)
+plotResiduals(simOutput, form = mod_phys$Border_road)
 
-summary(test) 
-summary(test2) #lowest AIC but convergence error
-summary(test3)
 
+#tested zero inflation because we have a lot of 0 presence observations
+testZeroInflation(simOutput) #this is okay, n.s. and well within the distribution
+
+#overdispersion is a common issue with poisson
+testOverdispersion(simOutput) #okay!
+
+```
+
+
+```{r spatial model effect size}
+sjPlot::plot_model(m2, show.values = TRUE, axis.lim = c(.001,1000), sort.est = TRUE, value.offset = .3)
+summary(m2)
 ```
 
 
@@ -65,45 +101,63 @@ var(beachData$Productivity, na.rm = TRUE) #1.537
 
 hist(log10(beachData$Productivity))
 
+mh1<-
 #can't use poisson distributions because they're non-integer values
 ```
 
 ### Human Model
 
-fitted following Zuur (2009) method
+fitted following Zuur (2009) methods
 
 
 ```{r random factor selection}
 #rescale numerical variables
-numcols<-which(sapply(mod_human[,1:23], is.numeric)) #don't rescale response variables for the poisson distribution (no neatives)
+numcols<-which(sapply(mod_human[,1:23], is.numeric)) #don't rescale response variables for the poisson distribution (no negatives)
 mod_humanSc<-mod_human
 mod_humanSc[,numcols] <- scale(mod_humanSc[,numcols])
 
 #assess random factor structure first
-rand_test<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests + (1|Year) + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#singular
-all_fit(rand_test)
+mh1<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|Year) + (1|BeachID), data = mod_human, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#scaling warning, and is singular
 
-rand_test2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests +  (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#unable to evaluate scaled gradient Hessian is numerically singular: parameters are not uniquely determined
-
-rand_test3<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests +  (1|Year), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#convergence code 1 from optimx: noneParameters or bounds appear to have different scalings.
-#also singular
+mh2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), data = mod_human, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#scaling warning, and unable to evaluate scaled gradient Hessian is numerically singular: parameters are not uniquely determined
 
 
-#compare AIC values to pick random structure
-summary(rand_test2) #472.5
-summary(rand_test2) #472.5
-summary(rand_test3) #513.2
+#compare AIC values to pick random structure?
+summary(mh1) #621.1
+summary(mh2) #619.1 #slightly better
 ```
 
+
+
 ```{r fixed factor selection}
+mh2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), data = mod_human, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+
+allFit(mh2)
+mh3<-glmmTMB(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), ziformula = ~1, data = mod_human, family = poisson(link = "log"))
+
+#fitTMB(mh3) #??????? not working
+```
+
+
+```{r model validations}
+simOutput <- simulateResiduals(fittedModel = mh2, plot = T) #bad
+
+testDispersion(mh2) #okay
+testZeroInflation(mh2) #an issue with zero inflation, downloading glmmTMB
+
+simOutput2 <- simulateResiduals(fittedModel = mh3, plot = T) #bad
+testZeroInflation(mh3) #technically did fix this part
+```
+
+
+```{r fixing singularity old}
 library("numDeriv")
 library("reshape2")
 library("afex")
 
-mod<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+mod<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
 summary(mod)
 
 tt <- getME(mod,"theta")
@@ -120,11 +174,6 @@ max(pmin(abs(sc_grad1),abs(derivs1$gradient))) #below the tolerance of .001 so t
 #more iterations?
 ss <- getME(mod_sc,c("theta","fixef"))
 mod2 <- update(mod_sc,start=ss,control=glmerControl(optCtrl=list(maxfun=2e4))) #still singular
-
-#different optimizer?
-test_mod<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_leashedPercent + County + fencedNests + (1|Year) + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"))
-#all the optimizers
-test<-all_fit(test_mod) #all singular
 
 
 ```
