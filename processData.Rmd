@@ -152,7 +152,6 @@ apply(is.na(mod_phys), 2, which) #all good no NAs
 
 #formatting
 mod_phys$Region<-as.factor(mod_phys$Region)
-mod_phys$Year<-as.factor(mod_phys$Year)
 mod_phys$BeachID<-as.factor(mod_phys$BeachID)
 
 #rescale BeachArea
@@ -238,6 +237,13 @@ apply(is.na(mod_human), 2, which)
 
 ```
 
+```{r files, eval = FALSE}
+write.csv(mod_human, file = '../Data/temporalMod.csv')
+write.csv(mod_phys, file = '../Data/spatialMod.csv')
+
+write.csv(piplSurvey, file = '../Data/SurveyDat.csv')
+
+```
 
 ### End
 

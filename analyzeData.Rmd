@@ -12,6 +12,10 @@ library(optimx)
 library(DHARMa)
 library(glmmTMB)
 
+mod_human<-read.csv(file = '../Data/temporalMod.csv') %>% 
+  select(-1)
+mod_phys<-read.csv(file = '../Data/spatialMod.csv') %>% 
+  select(-1)
 ```
 
 ## Stats Plan Ideas/Notes
@@ -37,78 +41,103 @@ Overall model
 
 
 ## Models
-So far beach area and foraging area are potentially significant
-no validation has occurred, restart model selection top down approach (zuur)
+
 ### Spatial Models
 ```{r poisson regression}
 hist(mod_phys$max_BP)
 mean(mod_phys$max_BP, na.rm = TRUE) #1.559
 var(mod_phys$max_BP, na.rm = TRUE) #3.044
 
-m1<- glmer(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + (1|Region), data = mod_phys, family = poisson(link = "log"))#likely complete separation (Downdated VtV is not positive definite error) and rescaling needed maybe, complete separation?
 m2<-glm(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + Region, data = mod_phys, family = poisson(link = "log")) # no error
+drop1(m1)
 
-#detect complete seperation?
-#library("brglm2"); glmer(form_rand, data = mod_phys, family = poisson(link = "log"), method="detect_separation")
+m2<-glm(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Region, data = mod_phys, family = poisson(link = "log"))#no error
+drop1(m2)
 
-summary(m2) 
+m3<-glm(max_BP ~ beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Region, data = mod_phys, family = poisson(link = "log"))#no error
+drop1(m3)
+
+m4<-glm(max_BP ~ beach_width + Length_km + parkArea + bufferPop_km2 + tot_area_km_Beach + developedLand + Region, data = mod_phys, family = poisson(link = "log"))#no error
+drop1(m4)
+
+m5<-glm(max_BP ~ beach_width + Length_km  + bufferPop_km2 + tot_area_km_Beach + developedLand + Region, data = mod_phys, family = poisson(link = "log"))#no error
+drop1(m5)
+
+m6<-glm(max_BP ~ beach_width + Length_km  + bufferPop_km2 + tot_area_km_Beach + Region, data = mod_phys, family = poisson(link = "log"))#no error
+drop1(m6)
+
+m7<-glm(max_BP ~ beach_width + Length_km  + bufferPop_km2 + Region, data = mod_phys, family = poisson(link = "log"))#no error
+drop1(m7) #dropping factors after this no longer improves AIC
+
+summary(m7)
 ```
+
 
 ```{r model validation}
 
 #model structure max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + Region
 # with DHARMa
 
-simOutput <- simulateResiduals(fittedModel = m2, plot = T)
+simOutput <- simulateResiduals(fittedModel = m7, plot = T)
 #some quantile deviations, fitted value plot n.s. and the effect is quite small, I'm okay with this model (DHARMa documentation)
-
-#for the variables
-plotResiduals(simOutput, form = mod_phys$bufferPop_km2)
-plotResiduals(simOutput, form = mod_phys$parkArea)
-plotResiduals(simOutput, form = mod_phys$BeachArea_km)
-plotResiduals(simOutput, form = mod_phys$beach_width) #quantile deviations, significant, but no patterns just higher than quantile, ok
-plotResiduals(simOutput, form = mod_phys$Length_km)
-plotResiduals(simOutput, form = mod_phys$tot_area_km_Beach) #quantile deviations, significant and with pattern
-plotResiduals(simOutput, form = mod_phys$developedLand) 
-
-
-#factor variables all n.s. for homogeneity and within group deviation
-plotResiduals(simOutput, form = mod_phys$Management)
-plotResiduals(simOutput, form = mod_phys$Region)
-plotResiduals(simOutput, form = mod_phys$Border_road)
-
 
 #tested zero inflation because we have a lot of 0 presence observations
 testZeroInflation(simOutput) #this is okay, n.s. and well within the distribution
 
 #overdispersion is a common issue with poisson
-testOverdispersion(simOutput) #okay!
+testDispersion(simOutput, type = "PearsonChisq") #okay
 
 ```
 
 
 ```{r spatial model effect size}
-sjPlot::plot_model(m2, show.values = TRUE, axis.lim = c(.001,1000), sort.est = TRUE, value.offset = .3)
-summary(m2)
+sjPlot::plot_model(m7, show.values = TRUE, axis.lim = c(.001,1000), sort.est = TRUE, value.offset = .3)
+
 ```
 
 
 
 ```{r productivity models}
-hist(beachData$Productivity)
-mean(beachData$Productivity, na.rm = TRUE) #0.749
-var(beachData$Productivity, na.rm = TRUE) #1.537
+hist(mod_phys$avg_productivity)
+mean(mod_phys$avg_productivity, na.rm = TRUE) #1.555
+var(mod_phys$avg_productivity, na.rm = TRUE) #1.550
 
-hist(log10(beachData$Productivity))
+hist(log10(mod_phys$avg_productivity))
 
-mh1<-
+mod.data.p<-mod_phys #%>% 
+  #filter(avg_productivity>0)
+
 #can't use poisson distributions because they're non-integer values
+mp1<-lm(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Management + Region, data = mod.data.p)
+drop1(mp1)
+
+mp2<-lm(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Region, data = mod.data.p)
+drop1(mp2)
+
+mp3<-lm(max_BP ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2  + tot_area_km_Beach + developedLand + Region, data = mod.data.p)
+drop1(mp3)
+
+mp4<-lm(max_BP ~ BeachArea_km + beach_width + Length_km + bufferPop_km2  + tot_area_km_Beach + developedLand + Region, data = mod.data.p)
+drop1(mp4)
+
+mp5<-lm(max_BP ~  beach_width + Length_km + bufferPop_km2  + tot_area_km_Beach + developedLand + Region, data = mod.data.p)
+drop1(mp5)
+
+mp6<-lm(max_BP ~  beach_width + Length_km + bufferPop_km2 + developedLand + Region, data = mod.data.p)
+drop1(mp6)
+
+mp7<-lm(max_BP ~  beach_width + Length_km + bufferPop_km2 + Region, data = mod.data.p)
+drop1(mp7)
+
+mp8<-lm(max_BP ~  beach_width + Length_km  + Region, data = mod.data.p)
+drop1(mp8)
+
+summary(mp8) #same interpretation as max_BP with all data, excluding 0s same except pop density removed in optimal model
 ```
 
 ### Human Model
 
 fitted following Zuur (2009) methods
-
 
 ```{r random factor selection}
 #rescale numerical variables
@@ -116,39 +145,66 @@ numcols<-which(sapply(mod_human[,1:23], is.numeric)) #don't rescale response var
 mod_humanSc<-mod_human
 mod_humanSc[,numcols] <- scale(mod_humanSc[,numcols])
 
+mean(mod.data$YE_pairs)
+var(mod.data$YE_pairs)
+
+mod.data<-mod_humanSc %>% 
+  select(BeachID:Year, signs_small:vehicles, dogs_unleashedTotal:dogs_all, peopleIntensity, County, YE_pairs) %>% 
+  na.omit()
+#with scaled variables
 #assess random factor structure first
-mh1<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|Year) + (1|BeachID), data = mod_human, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#scaling warning, and is singular
+mh1<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|Year) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#no error
 
-mh2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), data = mod_human, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#scaling warning, and unable to evaluate scaled gradient Hessian is numerically singular: parameters are not uniquely determined
+mh2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + Year + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#no error
 
+mh3<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|Year) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+#no error
+
+mh4<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+# no error
 
 #compare AIC values to pick random structure?
-summary(mh1) #621.1
-summary(mh2) #619.1 #slightly better
+summary(mh1) #637.9
+summary(mh2) #633.9
+summary(mh3) #631.2
+summary(mh4) #629.2 #best value
+
 ```
 
-
-
+YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests
 ```{r fixed factor selection}
-mh2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), data = mod_human, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+drop1(mh4, test = "Chi")
 
-allFit(mh2)
-mh3<-glmmTMB(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), ziformula = ~1, data = mod_human, family = poisson(link = "log"))
+mh5<-glmer(YE_pairs ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+drop1(mh5, test = "Chi")
 
-#fitTMB(mh3) #??????? not working
+mh6<-glmer(YE_pairs ~ signs_small + signs_large + dogs_all + peopleIntensity +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+drop1(mh6, test = "Chi")
+
+mh7<-glmer(YE_pairs ~ signs_small + signs_large + peopleIntensity +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+drop1(mh7, test = "Chi")
+
+summary(mh7)
+
 ```
 
 
 ```{r model validations}
-simOutput <- simulateResiduals(fittedModel = mh2, plot = T) #bad
+simOutput <- simulateResiduals(fittedModel = mh7, plot = T) #bad for uniformity and quantiles
 
-testDispersion(mh2) #okay
-testZeroInflation(mh2) #an issue with zero inflation, downloading glmmTMB
+testDispersion(mh7, type = "PearsonChisq") #not okay
+testZeroInflation(mh4) #okay
 
-simOutput2 <- simulateResiduals(fittedModel = mh3, plot = T) #bad
-testZeroInflation(mh3) #technically did fix this part
+#for the variables
+plotResiduals(simOutput, form = mod.data$signs_small)
+plotResiduals(simOutput, form = mod.data$signs_large)
+plotResiduals(simOutput, form = mod.data$peopleIntensity)
+plotResiduals(simOutput, form = mod.data$fencedNests)
+plotResiduals(simOutput, form = mod.data$BeachID) #n.s. okay
+plotResiduals(simOutput, form = mod.data$County) #also okay n.s. only a few groups non-uniform
+
 ```
 
 
