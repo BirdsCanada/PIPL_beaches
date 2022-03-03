@@ -91,16 +91,16 @@ beachnames<-append(beachnames, c("James", "Bowen Island", "Goose and Burks Point
   #rename(Description = descriptio, BeachID = Name)
 #landuse_old<-QGIS_names(landuse_old)
 
-landuse<-read.csv(file = '../Data/landuse_intersection.csv') %>% 
-  select(1:21,36,52:54,64:67,72) %>% 
+landuse<-read.csv(file = '../Data/intersectionArea_10.csv') %>% 
+  select(1:22,37,53:55,65:68,73) %>% 
   select_if(all_na)%>% 
-  rename(Description = descriptio, BeachID = Name, Int_Area = Int_Area2)
+  rename(Description = descriptio, BeachID = Name, Int_Area = Int_Area)
 landuse<-QGIS_names(landuse)
 
 #buffer area (only the intersection of the buffer and NS land area)
-buffer_area<-read.csv(file = '../Data/intersection_area.csv') %>% 
-  select(Name, Int_Area) %>% 
-  rename(land_area = Int_Area, BeachID = Name)
+buffer_area<-read.csv(file = '../Data/bufferArea_10.csv') %>% 
+  select(Name, BufferArea) %>% 
+  rename(land_area = BufferArea, BeachID = Name)
 buffer_area<-QGIS_names(buffer_area)
 
 #beachuse is all beach landuse polygons in a 2km buffer (foraging)
@@ -438,13 +438,13 @@ beachuse<-QGIS_names(beachuse) #fixing misspellings from QGIS data
 #summarize the area within the buffer by landclass designation
 x<-landuse %>% 
   group_by(BeachID,landclass) %>% 
-  summarize(tot_area = sum(Int_Area), tot_area_km = tot_area/1000000) #currently 30km buffer region data
+  summarize(tot_area_km = sum(Int_Area)) #currently 30km buffer region data
 x<-left_join(x,buffer_area) %>% 
-  mutate(percentage = tot_area/land_area)
+  mutate(percentage = tot_area_km/land_area)
 
 y<-beachuse %>% 
   group_by(BeachID) %>% 
-  summarize(tot_area_beach = sum(beach_area), tot_area_beach_km = tot_area_beach/1000000) # currently 2km buffer
+  summarize(tot_area_beach_km = sum(beach_area)/1000000) # currently 2km buffer
 
 x<-x %>% 
   mutate(temp = paste(BeachID, landclass, sep = "_"))
@@ -452,7 +452,6 @@ y<-y %>%
   mutate(temp = paste(BeachID, "_Beach", sep =""))
 
 x<-full_join(x,y, by = c('temp', 'BeachID'))
-x$tot_area<-ifelse(is.na(x$landclass), x$tot_area_beach, x$tot_area)
 x$tot_area_km<-ifelse(is.na(x$landclass), x$tot_area_beach_km, x$tot_area_km)  
 x$percentage<-ifelse(is.na(x$landclass), NA, x$percentage)
 x$landclass<-ifelse(is.na(x$landclass), "Beach", x$landclass)
@@ -466,6 +465,8 @@ beachPhys<-full_join(beachPhys, x[,1:6], by = 'BeachID')
 # fix goose haven naming, replace region and length with Port Joli (Goose Haven) values and then remove
 beachPhys$Region[beachPhys$BeachID == "Goose Haven"]<- "sNS"
 beachPhys$Length_km[beachPhys$BeachID == "Goose Haven"]<-0.477
+beachPhys$Management[beachPhys$BeachID == "Goose Haven"]<-"Private"
+beachPhys$BeachArea[beachPhys$BeachID == "Goose Haven"]<-6171
 beachPhys<- beachPhys %>% 
   filter(!BeachID == "Port Joli (Goose Haven)")
 ```
@@ -535,8 +536,8 @@ parking<-y %>%
 transects<-full_join(transects, parking)
 
 density<-density %>% 
-  select(Name, bufferPop_km2) %>% 
-  rename(BeachID = Name)
+  select(Name, sum) %>% 
+  rename(BeachID = Name, bufferPop_km2 = sum)
 
 density<-QGIS_names(density)
 
@@ -572,6 +573,13 @@ transects<-NULL
 parking<-NULL
 development<-NULL
 density<-NULL
+```
+
+
+```{r files, eval = FALSE}
+write.csv(piplSurvey, file = '../Data/SurveyDat.csv')
+write.csv(beachPhys, file = '../Data/beachPhysDat.csv')
+write.csv(prodData, file = '../Data/prodDat.csv')
 ```
 
 ## End

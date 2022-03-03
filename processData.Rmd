@@ -6,6 +6,10 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+
+#piplSurvey<-read.csv(file = '../Data/SurveyDat.csv')
+#beachPhys<-read.csv(file = '../Data/beachPhysDat.csv')
+#prodData<-read.csv(file = '../Data/prodDat.csv')
 ```
 
 To Do:
@@ -22,8 +26,12 @@ percentage of the landuse categories is based off land area present within the b
 
 ```{r big dataset}
 beachPhysW<-beachPhys %>% 
-  pivot_wider(names_from = landclass, values_from = c(tot_area_km, tot_area, percentage)) %>% 
-  select(-19,-24,-28,-29)
+  select(-temp) %>% 
+  pivot_wider(names_from = landclass, values_from = c(tot_area_km, percentage)) %>% 
+  select(-19,-23, -24) %>% 
+  filter(!BeachID == "") %>% 
+  mutate(percentage_Agriculture = ifelse(is.na(percentage_Agriculture), 0, percentage_Agriculture))%>% 
+  mutate(tot_area_km_Agriculture = ifelse(is.na(tot_area_km_Agriculture), 0, tot_area_km_Agriculture))
 
 #James Beach and Bowen island were surveyed separately 2012-2016 (Bowen island had no pairs) Remove Bowen island and rename James as James and Bowen Island
 #Same thing is true with Goose and Burks Point (Burks has no pairs prior to the joining of the sites in 2017)
@@ -33,10 +41,11 @@ beachProd<-prodData %>%
   mutate(BeachID = replace(BeachID, BeachID == "Goose (Indian) Point", "Goose and Burks Point")) %>% 
   filter(!BeachID == "Bowen Island") %>% 
   mutate(BeachID = replace(BeachID, BeachID == "James", "James & Bowen Island")) %>% 
+  mutate(Length_km = replace(Length_km, BeachID == "Goose and Burks Point", 2.1)) %>%  #Goose pt = .7 Burks = 1.4
   group_by(BeachID) %>% 
   fill(c(Region), .direction = "downup") %>% #fill in region gaps
-  ungroup() %>% 
-  mutate(Length_km = replace(Length_km, BeachID == "Goose and Burks Point", 2.1)) #Goose pt = .7 Burks = 1.4, 2.1 total
+  ungroup()
+  
 
 #filling in Goose and Burks point before joining, for most variables I will use the goose Point data (urban land, pop dens etc)
 x<-beachPhysW[beachPhysW$BeachID == "Goose (Indian) Point",]
@@ -52,7 +61,7 @@ beachPhysW<-beachPhysW %>%
 beachPhysW<-rbind(beachPhysW, x)
 
 
-beachData<-full_join(beachProd, beachPhysW[,c(1:6,8,10:14,16,23:25)], by = c('BeachID')) %>% 
+beachData<-full_join(beachProd, beachPhysW[,c(1:6,8,10:14,18:21)], by = c('BeachID')) %>% 
   distinct() %>% #keeps only percentage for landuse and total_km for 2km beach buffer
   rename(Length_km = Length_km.y, Region = Region.y) %>% 
   select(-Length_km.x, -Region.x) %>% 
@@ -225,7 +234,7 @@ BRC_survey[is.na(BRC_survey)]<-NA #changing all NaN to NA
 prodData$Year<-as.character(prodData$Year)
 BRC_survey$Year<-as.character(BRC_survey$Year)
 
-mod_human<-left_join(BRC_survey, prodData[,1:9])
+mod_human<-left_join(BRC_survey, prodData[,1:9],  by = c("BeachID", "Year"))
 
 mod_human$County<-as.factor(mod_human$County)
 mod_human$BeachID<-as.factor(mod_human$BeachID)
@@ -235,14 +244,14 @@ mod_human$Year<-as.factor(mod_human$Year)
 apply(is.na(mod_human), 2, which) 
 #avoid dogs_leashedPercent and dogsRespect_ind and Nestloss_HD because of many missing values
 
+mod_human$breedingSuccess<-ifelse(mod_human$YE_pairs>0, 1, 0)
+
 ```
+
 
 ```{r files, eval = FALSE}
 write.csv(mod_human, file = '../Data/temporalMod.csv')
 write.csv(mod_phys, file = '../Data/spatialMod.csv')
-
-write.csv(piplSurvey, file = '../Data/SurveyDat.csv')
-
 ```
 
 ### End
