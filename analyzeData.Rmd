@@ -42,6 +42,8 @@ Overall model
 ## Models
 
 ### Spatial Models
+
+####Breeding Pairs
 ```{r poisson regression}
 hist(mod_phys$max_BP)
 mean(mod_phys$max_BP, na.rm = TRUE) #1.559
@@ -55,7 +57,7 @@ summary(m1)
 summary(m2) #better AIC and I'm not happy with management and it's designations right now
 ```
 
-
+all good
 ```{r model validation}
 # with DHARMa
 
@@ -78,12 +80,11 @@ sjPlot::plot_model(m2, show.values = TRUE, axis.lim = c(.001,1000), sort.est = T
 ggplot(mod_phys, aes(tot_area_km_Beach, developedLand, color = Region)) + geom_point() + geom_smooth(method = "lm")
 ggplot(mod_phys, aes(tot_area_km_Beach, bufferPop_km2, color = Region)) + geom_point() + geom_smooth(method = "lm")
 
-lm(tot_area_km_Beach ~ bufferPop_km2, data = mod_phys) #n.s.
-
+ggplot(mod_phys, aes(Length_km, max_BP, color = beach_width))+ geom_point() +scale_color_gradient(low="red", high="yellow")
 ```
 
 
-Productivity models
+#### Productivity models
 ```{r productivity models}
 hist(mod_phys$avg_productivity)
 mean(mod_phys$avg_productivity, na.rm = TRUE) #1.555
@@ -124,10 +125,10 @@ sjPlot::plot_model(mp2, show.values = TRUE, sort.est = TRUE, value.offset = .3)
 ```
 
 
-### Human Model
+### Human Models
 
 fitted following Zuur (2009) methods for validation
-
+#### Breeding Success
 This model is A-OKAY
 ```{r logistic regression}
 mod.data<-mod_human %>% 
@@ -163,11 +164,13 @@ plotResiduals(simOutput, form = mod.data$County) #one group, sig
 
 
 ```{r plotting effect}
-sjPlot::plot_model(mb1, show.values = TRUE, axis.lim = c(.001,1000), sort.est = TRUE, value.offset = .3)
+sjPlot::plot_model(mb1, show.values = TRUE, sort.est = TRUE, value.offset = .3)
+
+
 ```
 
 
-Productivity model
+#### Productivity model
 ```{r productivity human model}
 mod.data.f<-mod_human %>% 
   select(BeachID:Year, signs_small:vehicles, dogs_unleashedTotal:dogs_all, peopleIntensity, County, Productivity) %>% 
@@ -189,12 +192,97 @@ testZeroInflation(mb1) #okay
 ```
 
 
-```{r effect size plot}
-sjPlot::plot_model(mf1, show.values = TRUE, axis.lim = c(.001,1000), sort.est = TRUE, value.offset = .3)
+```{r effect size plots }
+sjPlot::plot_model(mf1, show.values = TRUE, sort.est = TRUE, value.offset = .3)
+
+fig.data<-mod_human %>% 
+  mutate(fledglingSuccess = ifelse(Productivity >1.65, 1, 0)) %>% 
+  mutate(fencePres = ifelse(fencedNests >0, "Yes", "No")) %>% 
+  na.omit()
+fig.data<-left_join(fig.data, mod_phys[,c(1:2)], by = "BeachID")
+fig.data$pred.fledg <- predict(mf1, newdata=fig.data, type="response")
+
+ggplot(fig.data, aes(signs_large, YE_pairs, color = as.factor(fledglingSuccess), group = fledglingSuccess))+geom_point() + geom_smooth(method = "lm")
+
+ggplot(fig.data, aes(signs_large, fencedNests, color = as.factor(fledglingSuccess), group = fledglingSuccess))+geom_point() + geom_smooth(method = "lm")
+
+### this plot has potential, shows a difference in signs present at unsuccessful sites
+ggplot(fig.data, aes(signs_large, pred.fledg, group = fencePres, color = fencePres))+ geom_point() + geom_smooth(method = "lm")
+
+#looked at the effect by region and it was nothing important
+ggplot(fig.data, aes(signs_large, fledglingSuccess)) + geom_point(alpha=.5) +
+  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial))
+
+ggplot(fig.data, aes(fencedNests, fledglingSuccess)) + geom_point(alpha=.5) +
+  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial)) 
+
+#rug plots are underwhelming
+fig.data<-fig.data %>% 
+  mutate(goodFledg = ifelse(fledglingSuccess == 1, fencedNests, NA),
+         badFledg  = ifelse(fledglingSuccess == 0, fencedNests, NA)) %>% 
+  mutate(goodFledgSign = ifelse(fledglingSuccess == 1, signs_large, NA),
+         badFledgSign  = ifelse(fledglingSuccess == 0, signs_large, NA))
+
+ggplot(fig.data, aes(x = fencedNests, y = fledglingSuccess)) +
+  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial)) +
+  labs(x = "fencedNests", y = "Fledgling Goal") +
+  geom_rug(aes(x = badFledg), sides = "b", alpha = 0.2) +
+  geom_rug(aes(x = goodFledg), sides = "t", alpha = 0.2)
+
+ggplot(fig.data, aes(x = signs_large, y = fledglingSuccess)) +
+  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial)) +
+  labs(x = "fencedNests", y = "Fledgling Goal") +
+  geom_rug(aes(x = badFledgSign), sides = "b", alpha = 0.2) +
+  geom_rug(aes(x = goodFledgSign), sides = "t", alpha = 0.2)
+```
+
+## Figures
+
+```{r table}
+beachTable<-data.frame(mod_phys$BeachID) %>% 
+  rename(Beach = mod_phys.BeachID)
+beachTable$SpatialModel<-"x"
+beachTable$TemporalModel<-ifelse(beachTable$Beach %in% mod_human$BeachID, "x", "")
+beachTable$Region<-mod_phys$Region
+beachTable<-left_join(beachTable, mod_human[,c(1,23)], by = c("Beach"="BeachID")) %>% 
+  unique() %>% 
+  mutate(County = replace(County, Beach == "James", "Pictou")) %>% 
+  mutate(County = replace(County, Beach == "Bowen Island", "Pictou")) %>% 
+  mutate(County = replace(County, Beach == "Stoney (Lawrencetown Head)", "Halifax")) %>% 
+  mutate(County = replace(County, Beach == "Cranberry Pond", "Queens")) %>% 
+  mutate(County = replace(County, Beach == "Harbour Breeze, Port Joli", "Shelburne")) %>%
+  mutate(County = replace(County, Beach == "Dominion (Lingan)", "Cape Breton")) %>% 
+  mutate(County = replace(County, Beach == "Ogdens Pond", "Antigonish")) %>% 
+  filter(!is.na(County)) %>% 
+  arrange(Region, County) %>% 
+  select(Region:County, Beach, SpatialModel, TemporalModel)
+
+write.table(beachTable)
 ```
 
 
-##### old model code
+```{r}
+sjPlot::plot_model(mf1, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
+sjPlot::plot_model(mb1, show.values = TRUE, value.offset = .3)
+save_plot(plot_model(mb1, show.values = TRUE, value.offset = .3))
+mf1_eff<-get_model_data(mf1, type = "est")
+mb1_eff<-get_model_data(mb1, type = "est")
+#save and join together in word?
+sjPlot::tab_model(mf1)
+sjPlot::tab_model(mb1)
+
+f<-ggplot(mf1_eff, aes(estimate, term, color = group)) + geom_vline(aes(xintercept = 1),color = "gray") + geom_point()
+
+f + geom_errorbar(aes(xmin=conf.low, xmax=conf.high), width=.08,position=position_dodge(.9)) + scale_x_continuous(limits = c(.01,100),trans = "log10", breaks = c(0.01,0.1,1,10,100), labels = c(0.01,0.1,1,10,100))  + scale_y_discrete(labels = c("Fenced Nests", "Mean Unleashed Dogs", "Visitor Intensity", "Mean Total Dogs", "Large Signs","Small Signs"))+ labs(x = "Odds Ratio", y = "Model Term") + geom_text(aes(label = p.label), vjust = -1) + theme(legend.position="none")
+
+b<-ggplot(mb1_eff, aes(estimate, term, color = group)) + geom_vline(aes(xintercept = 1),color = "gray") + geom_point()
+
+b + geom_errorbar(aes(xmin=conf.low, xmax=conf.high), width=.08,position=position_dodge(.9)) + scale_x_continuous(limits = c(.1,1000000),trans = "log10", breaks = c(0.01,0.1,1,10,100,1000,10000,100000,1000000), labels = c(0.01,0.1,1,10,100,1000,10000,100000,1000000))  + scale_y_discrete(labels = c("Fenced Nests", "Mean Unleashed Dogs", "Visitor Intensity", "Mean Total Dogs", "Large Signs","Small Signs"))+ labs(x = "Odds Ratio", y = "Model Term") + geom_text(aes(label = p.label), vjust = -1) + theme(legend.position="none")
+```
+
+
+
+## old model code
 ```{r fixing singularity old}
 library("numDeriv")
 library("reshape2")
@@ -291,4 +379,4 @@ plotResiduals(simOutput, form = mod.data$County) #also okay n.s. only a few grou
 
 ```
 
-### End
+## End
