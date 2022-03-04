@@ -151,6 +151,7 @@ mod_phys<-mod_phys %>%
   mutate(BeachArea = replace(BeachArea, BeachID == "Goose Haven", 6171)) %>% 
   mutate(Border_road = replace(Border_road, BeachID == "James", "part")) %>% 
   mutate(Border_road = replace(Border_road, BeachID == "Bowen Island", "part")) %>% 
+  mutate(Border_road = replace(Border_road, BeachID == "Summerville", "all")) %>% 
   mutate(Paths_present = replace(Paths_present, BeachID == "James", "no")) %>% 
   mutate(Paths_present = replace(Paths_present, BeachID == "Bowen Island", "no")) %>% 
   mutate(Parking_present = replace(Parking_present, BeachID == "James", "no")) %>% 
