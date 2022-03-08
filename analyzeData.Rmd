@@ -192,7 +192,9 @@ testZeroInflation(mb1) #okay
 ```
 
 
+
 ```{r effect size plots }
+
 sjPlot::plot_model(mf1, show.values = TRUE, sort.est = TRUE, value.offset = .3)
 
 fig.data<-mod_human %>% 
@@ -234,9 +236,10 @@ ggplot(fig.data, aes(x = signs_large, y = fledglingSuccess)) +
   labs(x = "fencedNests", y = "Fledgling Goal") +
   geom_rug(aes(x = badFledgSign), sides = "b", alpha = 0.2) +
   geom_rug(aes(x = goodFledgSign), sides = "t", alpha = 0.2)
+
 ```
 
-## Figures
+### Figures
 
 ```{r table}
 beachTable<-data.frame(mod_phys$BeachID) %>% 
@@ -261,7 +264,7 @@ write.table(beachTable)
 ```
 
 
-```{r}
+```{r effect size manual}
 sjPlot::plot_model(mf1, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
 sjPlot::plot_model(mb1, show.values = TRUE, value.offset = .3)
 save_plot(plot_model(mb1, show.values = TRUE, value.offset = .3))
@@ -278,11 +281,13 @@ f + geom_errorbar(aes(xmin=conf.low, xmax=conf.high), width=.08,position=positio
 b<-ggplot(mb1_eff, aes(estimate, term, color = group)) + geom_vline(aes(xintercept = 1),color = "gray") + geom_point()
 
 b + geom_errorbar(aes(xmin=conf.low, xmax=conf.high), width=.08,position=position_dodge(.9)) + scale_x_continuous(limits = c(.1,1000000),trans = "log10", breaks = c(0.01,0.1,1,10,100,1000,10000,100000,1000000), labels = c(0.01,0.1,1,10,100,1000,10000,100000,1000000))  + scale_y_discrete(labels = c("Fenced Nests", "Mean Unleashed Dogs", "Visitor Intensity", "Mean Total Dogs", "Large Signs","Small Signs"))+ labs(x = "Odds Ratio", y = "Model Term") + geom_text(aes(label = p.label), vjust = -1) + theme(legend.position="none")
+
 ```
 
 
 
 ## old model code
+
 ```{r fixing singularity old}
 library("numDeriv")
 library("reshape2")
