@@ -10,6 +10,7 @@ library(tidyverse)
 library(lme4)
 library(optimx)
 library(DHARMa)
+library(fuzzyjoin)
 
 mod_human<-read.csv(file = '../Data/temporalMod.csv') %>% 
   select(-1)
@@ -121,7 +122,7 @@ testDispersion(simOutput, type = "PearsonChisq", alternative = "greater") #n.s.
 
 ```{r spatial model effect size}
 sjPlot::plot_model(mp2, show.values = TRUE, sort.est = TRUE, value.offset = .3)
-
+sjPlot::tab_model(mp2, show.aic = TRUE)
 ```
 
 
@@ -165,7 +166,6 @@ plotResiduals(simOutput, form = mod.data$County) #one group, sig
 
 ```{r plotting effect}
 sjPlot::plot_model(mb1, show.values = TRUE, sort.est = TRUE, value.offset = .3)
-
 
 ```
 
@@ -239,7 +239,7 @@ ggplot(fig.data, aes(x = signs_large, y = fledglingSuccess)) +
 
 ```
 
-### Figures
+## Figures
 
 ```{r table}
 beachTable<-data.frame(mod_phys$BeachID) %>% 
@@ -267,7 +267,7 @@ write.table(beachTable)
 ```{r effect size manual}
 sjPlot::plot_model(mf1, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
 sjPlot::plot_model(mb1, show.values = TRUE, value.offset = .3)
-save_plot(plot_model(mb1, show.values = TRUE, value.offset = .3))
+
 mf1_eff<-get_model_data(mf1, type = "est")
 mb1_eff<-get_model_data(mb1, type = "est")
 #save and join together in word?
@@ -282,6 +282,39 @@ b<-ggplot(mb1_eff, aes(estimate, term, color = group)) + geom_vline(aes(xinterce
 
 b + geom_errorbar(aes(xmin=conf.low, xmax=conf.high), width=.08,position=position_dodge(.9)) + scale_x_continuous(limits = c(.1,1000000),trans = "log10", breaks = c(0.01,0.1,1,10,100,1000,10000,100000,1000000), labels = c(0.01,0.1,1,10,100,1000,10000,100000,1000000))  + scale_y_discrete(labels = c("Fenced Nests", "Mean Unleashed Dogs", "Visitor Intensity", "Mean Total Dogs", "Large Signs","Small Signs"))+ labs(x = "Odds Ratio", y = "Model Term") + geom_text(aes(label = p.label), vjust = -1) + theme(legend.position="none")
 
+```
+```{r for Mapping}
+centroids<-read.csv(file = '../Data/map.info.csv') %>% 
+  select(Name,BeachArea, xcoord:ycoord) %>% 
+  rename(BeachID = Name)
+
+y<-centroids 
+x<-mod_phys
+
+x<-stringdist_join(x, y, 
+                by = "BeachID",
+                mode = "left",
+                ignore_case = FALSE, 
+                method = "jw", 
+                max_dist = 99, 
+                distance_col = "dist") %>%
+  group_by(BeachID.x) %>%
+  slice_min(order_by = dist, n = 1) %>% 
+  unique %>% 
+  select(1,28,32)
+
+colnames(x)<-c("BeachID", "correction", "dist")
+
+#manually reassigning mismatches for fuzzy
+x[x$BeachID == "Goose Haven", 2]<- "Port Joli (Goose Haven)"
+x[x$BeachID == "White Point Beach", 2]<- "Gull Island Beach"
+
+map_df<-full_join(centroids, x, by = c("BeachID" = "correction")) %>% 
+  filter(!is.na(BeachID.y)) %>% 
+  rename(BeachID_original = BeachID, BeachID = BeachID.y) %>% 
+  select(-dist) %>% 
+  left_join(mod_phys)
+#write.csv( map_df, file = '../Data/map_phys_data.csv')
 ```
 
 
