@@ -106,23 +106,35 @@ summary(mp2)
 
 AIC(mp1,mp2) #mp2 AIC = 196.6, mp1 AIC = 201.7
 
+#exclusing zero values
+mp3<-lm(avg_productivity ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Region, data = (mod.data.p %>% filter(avg_productivity>0)))
+mp4<-lm(avg_productivity_all ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Region, data = mod.data.p)
+
+summary(mp3)
 ```
 
-issues with model validation :(
+
 ```{r model validation prod}
 simOutput <- simulateResiduals(fittedModel = mp2, plot = T)#okay
 
 #tested zero inflation because we have a lot of 0 presence observations
 testZeroInflation(simOutput) #problem
-
-#overdispersion is a common issue with poisson
 testDispersion(simOutput, type = "PearsonChisq", alternative = "greater") #n.s.
+
+#excluding zero values
+simOutputz <- simulateResiduals(fittedModel = mp3, plot = T)#okay
+
+#tested zero inflation because we have a lot of 0 presence observations
+testZeroInflation(simOutputz) #okay
+testDispersion(simOutputz, type = "PearsonChisq", alternative = "greater") #n.s.
 ```
 
 
 ```{r spatial model effect size}
 sjPlot::plot_model(mp2, show.values = TRUE, sort.est = TRUE, value.offset = .3)
-sjPlot::tab_model(mp2, show.aic = TRUE)
+
+#with no zero values effect size trends are the same however developed land is no longer significant
+sjPlot::plot_model(mp3, show.values = TRUE, sort.est = TRUE, value.offset = .3)
 ```
 
 
@@ -241,7 +253,7 @@ ggplot(fig.data, aes(x = signs_large, y = fledglingSuccess)) +
 
 ## Figures
 
-```{r table}
+```{r tables}
 beachTable<-data.frame(mod_phys$BeachID) %>% 
   rename(Beach = mod_phys.BeachID)
 beachTable$SpatialModel<-"x"
@@ -261,10 +273,21 @@ beachTable<-left_join(beachTable, mod_human[,c(1,23)], by = c("Beach"="BeachID")
   select(Region:County, Beach, SpatialModel, TemporalModel)
 
 write.table(beachTable)
+
+sjPlot::tab_model(mp2, m2, show.aic = TRUE)
+
+sjPlot::tab_model(mb1, mf1, show.aic = TRUE)
 ```
 
 
-```{r effect size manual}
+```{r phys mods eff size}
+sjPlot::plot_model(m2, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
+sjPlot::plot_model(mp2, show.values = TRUE, value.offset = .3)
+
+```
+
+
+```{r human mods eff size}
 sjPlot::plot_model(mf1, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
 sjPlot::plot_model(mb1, show.values = TRUE, value.offset = .3)
 
