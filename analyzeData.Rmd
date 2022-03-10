@@ -86,6 +86,11 @@ ggplot(mod_phys, aes(Length_km, max_BP, color = beach_width))+ geom_point() +sca
 
 
 #### Productivity models
+
+note productivity model is zero-inflated however all residuals tests are normal other than that. I tried running it with zeros excluded and it only changed interpretation slightly with developed land (smaller effect size, though still relatively large, and non significant with zeros excluded)
+
+I also considered using avg_productivity_all (which is an average including years where productivity was 0) but I don't think it's as good a representation and also was zero inflated in a glm with a poisson distribution
+
 ```{r productivity models}
 hist(mod_phys$avg_productivity)
 mean(mod_phys$avg_productivity, na.rm = TRUE) #1.555
@@ -108,7 +113,6 @@ AIC(mp1,mp2) #mp2 AIC = 196.6, mp1 AIC = 201.7
 
 #exclusing zero values
 mp3<-lm(avg_productivity ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Region, data = (mod.data.p %>% filter(avg_productivity>0)))
-mp4<-lm(avg_productivity_all ~ BeachArea_km + beach_width + Length_km + parkArea + bufferPop_km2 + Border_road + tot_area_km_Beach + developedLand + Region, data = mod.data.p)
 
 summary(mp3)
 ```
@@ -135,6 +139,7 @@ sjPlot::plot_model(mp2, show.values = TRUE, sort.est = TRUE, value.offset = .3)
 
 #with no zero values effect size trends are the same however developed land is no longer significant
 sjPlot::plot_model(mp3, show.values = TRUE, sort.est = TRUE, value.offset = .3)
+
 ```
 
 
