@@ -238,7 +238,7 @@ apply(is.na(mod_human), 2, which)
 #avoid dogs_leashedPercent and dogsRespect_ind and Nestloss_HD because of many missing values
 
 mod_human$breedingSuccess<-ifelse(mod_human$YE_pairs>0, 1, 0)
-
+mod_human$fledglingSuccess<-ifelse(mod_human$Productivity >1.65, 1, 0)
 ```
 
 writes the dfs used for the models

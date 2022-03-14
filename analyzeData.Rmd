@@ -176,8 +176,7 @@ sjPlot::plot_model(mb2, show.values = TRUE, sort.est = TRUE, value.offset = .3)
 #### Productivity model
 ```{r productivity human model}
 mod.data.f<-mod_human %>% 
-  select(BeachID:Year, signs_small:vehicles, dogs_unleashedTotal:dogs_all, peopleIntensity, County, Productivity) %>% 
-  mutate(fledglingSuccess = ifelse(Productivity >1.65, 1, 0)) %>% 
+  select(BeachID:Year, signs_small:vehicles, dogs_unleashedTotal:dogs_all, peopleIntensity, County, Productivity, fledglingSuccess) %>% 
   na.omit()
 
 mf1<-glmer(fledglingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data.f, family = binomial, control = glmerControl(optimizer = "Nelder_Mead"))
