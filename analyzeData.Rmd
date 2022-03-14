@@ -247,7 +247,7 @@ sjPlot::plot_model(m2, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000)
 sjPlot::plot_model(mp2, show.values = TRUE, value.offset = .3)
 
 #saved 7x8 landscape as pdf
-plot_models(m2, mp2, m.labels = c("Productivity", "Breeding Pairs"), show.p = TRUE, p.shape = FALSE, show.values = TRUE, spacing = .7, dot.size = 1.2, value.size = 3, axis.labels = c("Region","Developed Land","Foraging Area","Border Road","Part Border Road","No Border Road","Population Density","Parking Area","Beach Length","Beach Width","Beach Area"))
+plot_models(mp2, m2, m.labels = c("Productivity", "Breeding Pairs"), show.p = TRUE, p.shape = FALSE, show.values = TRUE, spacing = .7, dot.size = 1.2, value.size = 3, axis.labels = c("Region","Developed Land","Foraging Area","Border Road","Part Border Road","No Border Road","Population Density","Parking Area","Beach Length","Beach Width","Beach Area"))
 
 #this is worth discussing!
 ggplot(mod_phys, aes(tot_area_km_Beach, developedLand, color = Region)) + geom_point() + geom_smooth(method = "lm") + labs(x = "Foraging Area", y = "Developed Land") + scale_color_discrete(labels = c("Northern NS", "Southern NS"))
