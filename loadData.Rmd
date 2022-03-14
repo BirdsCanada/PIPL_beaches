@@ -11,24 +11,18 @@ library(fuzzyjoin)
 ```
 
 Note: I'm using relative paths as of right now, my file structure includes a folder with the project subdirectory and a Data folder within, my wd is the project subdirectory
-Is this the path style I should keep using?
-
-To Do:
-get complete beach area, and parking lot area data
-update management blanks
 
 
 Follow-Up Notes:
--loc_id What is this? is it a coordinates or correlates to a beach?
--Not sure what to do about locations joined in some years but separate in others
--2012-2017 BRC I have all Northern NS survey data raw, but only sandwalkers and dog raw for southern (email someone if needed)
+-2012-2017 BRC I have all Northern NS survey data raw, but only sandwalkers and dog raw for southern 
+  -*I fixed this however the NNS data from first BRC records variables differently and won't be included*
 
 
 These Beaches are mentioned in spreadsheets but will be excluded since they're not in the BRC or the GIS data and don't appear to be regularly monitored:
 "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm", "Ratcliffe Hills (The Cape)"
 
 
-Here I load in the 2017-2021 BRC data that was downloaded from Nature Counts and saved as a .csv
+Here I load in all the dfs that will be used and cleaned
 ```{r load data}
 #function to remove columns that are all NA
 all_na <- function(x) any(!is.na(x)) 
@@ -122,7 +116,9 @@ parking<-read.csv(file = '../Data/parking.csv')
 density<-read.csv(file = '../Data/pipl_density3.csv')
 ```
 
-Cleaning and Reformatting
+
+this is included so all the code is submitted, but is not necessary if redoing or tweaking analysis, go to the processData and read in the cleaned dfs and go forward from there.
+##Cleaning and Reformatting
 ### Survey Data (human impact data)
 ```{r clean 2017-2021 survey data}
 beaches<-piplSurveyAll %>% 
