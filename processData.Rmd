@@ -7,19 +7,12 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 
-#piplSurvey<-read.csv(file = '../Data/SurveyDat.csv')
-#beachPhys<-read.csv(file = '../Data/beachPhysDat.csv')
-#prodData<-read.csv(file = '../Data/prodDat.csv')
+piplSurvey<-read.csv(file = '../Data/SurveyDat.csv')
+beachPhys<-read.csv(file = '../Data/beachPhysDat.csv')
+prodData<-read.csv(file = '../Data/prodDat.csv')
 ```
 
-To Do:
--get a number for each beach that shows the amount of land within the buffer (exclude sea) (DONE)
--finalize buffer size
--process landuse data (DONE)
--reformat with physical data (DONE)
--process survey data into format for analysis (DONE)
--visualize
--pca of survey variables (not doing)
+This file reads in the cleaned data files (SurveyDat, beachPhysDat and prodDat) and adds any calculated data.
 
 
 percentage of the landuse categories is based off land area present within the buffer, not including ocean or water bodies within.
@@ -67,7 +60,7 @@ beachData<-full_join(beachProd, beachPhysW[,c(1:6,8,10:14,18:21)], by = c('Beach
   select(-Length_km.x, -Region.x) %>% 
   mutate(beach_width = replace(beach_width, BeachID == "James & Bowen Island", beachPhysW$beach_width[beachPhysW$BeachID== "James"]))  # the only missing value between the grouped and alone beaches
  
-
+#look at which variable have lots of entries, for selection
 x<-piplSurvey %>% 
   summarise_all(funs(sum(is.na(.))))%>%
   pivot_longer(!BeachID, names_to = "variable", values_to = "count_na") %>% 
@@ -76,7 +69,7 @@ x<-piplSurvey %>%
 x %>% 
   filter(count_na < 1000)
 ```
-Based on the above I think the main variables to include are:
+Based on the above I think the main variables we could include are:
 dogs_leashedStart & dogs_unleashedStart (20,21)
 signs_small & signs_large (25,26)
 fencedNests & vehicles & litter (28,37,39)
@@ -123,16 +116,15 @@ boxplot(beachData[,c(24:26)]) #some outliers in road and urban (probably near ha
 
 ### Model dfs
 
-two models
+two model sets (productivity and BP model for each, 4 total)
 one is year specific with human variables (survey data)
-  -use the CWS pipl productivity as response variable
-  -only include beaches surveyed sufficiently
-one is beach specific and has all physical data (beach characteristics, landuse etc)
-  -use total breeding pairs over surveyed period?
+  -only include beaches surveyed sufficiently (more than 4 years)
+  -use yearly values for breeding pairs and productivity
+one is beach specific and has all physical data (beach characteristics, landuse etc), averaged over 10 years
+  -use total breeding pairs over surveyed period
+  -average productivity in years that had successful breeding
   -include more beaches? (as long as we have the CWS and phys data)
 
-Maybe a model with only beaches that have pipl?
-  - using relevant factors as informed by the other two models?
 
 ```{r prep for models}
 x<-prodData %>% 
@@ -249,7 +241,7 @@ mod_human$breedingSuccess<-ifelse(mod_human$YE_pairs>0, 1, 0)
 
 ```
 
-
+writes the dfs used for the models
 ```{r files, eval = FALSE}
 write.csv(mod_human, file = '../Data/temporalMod.csv')
 write.csv(mod_phys, file = '../Data/spatialMod.csv')

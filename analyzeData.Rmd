@@ -41,7 +41,7 @@ Overall model
 
 
 ## Models
-
+fitted following Zuur (2009) methods for validation
 ### Spatial Models
 
 ####Breeding Pairs
@@ -77,11 +77,6 @@ testDispersion(simOutput, type = "PearsonChisq") #okay
 ```{r spatial model effect size}
 sjPlot::plot_model(m2, show.values = TRUE, axis.lim = c(.001,1000), sort.est = TRUE, value.offset = .3)
 
-#these are worth discussing!
-ggplot(mod_phys, aes(tot_area_km_Beach, developedLand, color = Region)) + geom_point() + geom_smooth(method = "lm")
-ggplot(mod_phys, aes(tot_area_km_Beach, bufferPop_km2, color = Region)) + geom_point() + geom_smooth(method = "lm")
-
-ggplot(mod_phys, aes(Length_km, max_BP, color = beach_width))+ geom_point() +scale_color_gradient(low="red", high="yellow")
 ```
 
 
@@ -145,7 +140,6 @@ sjPlot::plot_model(mp3, show.values = TRUE, sort.est = TRUE, value.offset = .3)
 
 ### Human Models
 
-fitted following Zuur (2009) methods for validation
 #### Breeding Success
 This model is A-OKAY
 ```{r logistic regression}
@@ -153,10 +147,16 @@ mod.data<-mod_human %>%
   select(BeachID:Year, signs_small:vehicles, dogs_unleashedTotal:dogs_all, peopleIntensity, County, breedingSuccess) %>% 
   na.omit()
 
-mb1<-glmer(breedingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+mb1<-glmer(breedingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal + vehicles + fencedNests + (1|County) + (1|BeachID), data = mod.data, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 #allFit(mb1) #bobyqa
 
-summary(mb1)
+summary(mb1) #AIC 216.2
+
+# the significance is not different and this creates minor (n.s.) issues with the residuals in validation
+mb2<-glmer(breedingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + vehicles + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+
+summary(mb2) #AIC = 216.7
+#AIC basically equivalent I will sue the vehicle model
 ```
 
 
@@ -165,25 +165,11 @@ simOutput <- simulateResiduals(fittedModel = mb1, plot = T) #some quantile abnor
 
 testDispersion(mb1, type = "PearsonChisq", alternative = "greater") #okay, only looked for overdispersion
 testZeroInflation(mb1) #okay
-
-
-#for the variables
-plotResiduals(simOutput, form = mod.data$signs_small)
-plotResiduals(simOutput, form = mod.data$signs_large)
-plotResiduals(simOutput, form = mod.data$peopleIntensity)
-plotResiduals(simOutput, form = mod.data$fencedNests)
-plotResiduals(simOutput, form = mod.data$dogs_all) #issues but n.s.
-plotResiduals(simOutput, form = mod.data$dogs_unleashedTotal)
-plotResiduals(simOutput, form = mod.data$BeachID) #n.s. okay
-plotResiduals(simOutput, form = mod.data$County) #one group, sig
-
-#model okay
 ```
 
 
 ```{r plotting effect}
-sjPlot::plot_model(mb1, show.values = TRUE, sort.est = TRUE, value.offset = .3)
-
+sjPlot::plot_model(mb2, show.values = TRUE, sort.est = TRUE, value.offset = .3)
 ```
 
 
@@ -194,32 +180,100 @@ mod.data.f<-mod_human %>%
   mutate(fledglingSuccess = ifelse(Productivity >1.65, 1, 0)) %>% 
   na.omit()
 
-mf1<-glmer(fledglingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = binomial, control = glmerControl(optimizer = "Nelder_Mead"))
+mf1<-glmer(fledglingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data.f, family = binomial, control = glmerControl(optimizer = "Nelder_Mead"))
 #allFit(mf1) #Nelder_Mead
 
-summary(mf1)
+summary(mf1) #AIC = 278.6
+
+mf2<-glmer(fledglingSuccess ~ signs_small + signs_large + dogs_all + vehicles + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data.f, family = binomial, control = glmerControl(optimizer = "Nelder_Mead"))
+#allFit(mf1) #Nelder_Mead
+
+summary(mf2) #AIC = 279.3
+
+#Aic almost the same will use vehicle model
 ```
 
 model okay
 ```{r fledgling validation}
-simOutput <- simulateResiduals(fittedModel = mf1, plot = T) #some quantile abnormality but n.s.
+simOutput <- simulateResiduals(fittedModel = mf2, plot = T) # good
 
 testDispersion(mb1, type = "PearsonChisq", alternative = "greater") #okay
 testZeroInflation(mb1) #okay
 ```
 
 
-
 ```{r effect size plots }
+sjPlot::plot_model(mf2, show.values = TRUE, sort.est = TRUE, value.offset = .3)
+```
 
-sjPlot::plot_model(mf1, show.values = TRUE, sort.est = TRUE, value.offset = .3)
+## Figures
 
+```{r tables}
+beachTable<-data.frame(mod_phys$BeachID) %>% 
+  rename(Beach = mod_phys.BeachID)
+beachTable$SpatialModel<-"x"
+beachTable$TemporalModel<-ifelse(beachTable$Beach %in% mod_human$BeachID, "x", "")
+beachTable$Region<-mod_phys$Region
+beachTable<-left_join(beachTable, mod_human[,c(1,23)], by = c("Beach"="BeachID")) %>% 
+  unique() %>% 
+  mutate(County = replace(County, Beach == "James", "Pictou")) %>% 
+  mutate(County = replace(County, Beach == "Bowen Island", "Pictou")) %>% 
+  mutate(County = replace(County, Beach == "Stoney (Lawrencetown Head)", "Halifax")) %>% 
+  mutate(County = replace(County, Beach == "Cranberry Pond", "Queens")) %>% 
+  mutate(County = replace(County, Beach == "Harbour Breeze, Port Joli", "Shelburne")) %>%
+  mutate(County = replace(County, Beach == "Dominion (Lingan)", "Cape Breton")) %>% 
+  mutate(County = replace(County, Beach == "Ogdens Pond", "Antigonish")) %>% 
+  filter(!is.na(County)) %>% 
+  arrange(Region, County) %>% 
+  select(Region:County, Beach, SpatialModel, TemporalModel)
+
+#shows which sites are in each model
+write.table(beachTable)
+
+#model tables, edit names in word
+sjPlot::tab_model(mp2, m2, show.aic = TRUE)
+sjPlot::tab_model(mb2, mf2, show.aic = TRUE)
+
+#save and join together in word
+sjPlot::tab_model(mf2, show.aic = TRUE)
+sjPlot::tab_model(mb2, show.aic = TRUE)
+
+#number of observations under 2 BP
+sum(mod_phys$max_BP < 2)/sum(mod_phys$max_BP)
+```
+
+
+```{r phys mods eff size}
+sjPlot::plot_model(m2, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
+sjPlot::plot_model(mp2, show.values = TRUE, value.offset = .3)
+
+#saved 7x8 landscape as pdf
+plot_models(m2, mp2, m.labels = c("Productivity", "Breeding Pairs"), show.p = TRUE, p.shape = FALSE, show.values = TRUE, spacing = .7, dot.size = 1.2, value.size = 3, axis.labels = c("Region","Developed Land","Foraging Area","Border Road","Part Border Road","No Border Road","Population Density","Parking Area","Beach Length","Beach Width","Beach Area"))
+
+#this is worth discussing!
+ggplot(mod_phys, aes(tot_area_km_Beach, developedLand, color = Region)) + geom_point() + geom_smooth(method = "lm") + labs(x = "Foraging Area", y = "Developed Land") + scale_color_discrete(labels = c("Northern NS", "Southern NS"))
+```
+
+
+```{r human mods eff size}
+sjPlot::plot_model(mf2, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
+sjPlot::plot_model(mb2, show.values = TRUE, value.offset = .3)
+
+#do this for both, was going to do in ggplot but conversion of eff size for the other models would be a pain 
+#(saved 7x8 landscape)
+plot_models(mf2, mb2, m.labels = c("Productivity", "Breeding Pairs"), show.p = TRUE, p.shape = FALSE, show.values = TRUE, spacing = .7, dot.size = 1.2, value.size = 4.5, axis.labels = c("Fenced Nests","Mean Unleashed Dogs","Vehicles","Visitor Intensity","Mean Total Dogs","Large Signs","Small Signs"))
+```
+
+
+```{r human mods figs}
+#messing around
 fig.data<-mod_human %>% 
   mutate(fledglingSuccess = ifelse(Productivity >1.65, 1, 0)) %>% 
   mutate(fencePres = ifelse(fencedNests >0, "Yes", "No")) %>% 
   na.omit()
-fig.data<-left_join(fig.data, mod_phys[,c(1:2)], by = "BeachID")
+fig.data<-left_join(fig.data, mod_phys[,c(1:4, 7, 9, 25,27)], by = "BeachID")
 fig.data$pred.fledg <- predict(mf1, newdata=fig.data, type="response")
+
 
 ggplot(fig.data, aes(signs_large, YE_pairs, color = as.factor(fledglingSuccess), group = fledglingSuccess))+geom_point() + geom_smooth(method = "lm")
 
@@ -254,64 +308,16 @@ ggplot(fig.data, aes(x = signs_large, y = fledglingSuccess)) +
   geom_rug(aes(x = badFledgSign), sides = "b", alpha = 0.2) +
   geom_rug(aes(x = goodFledgSign), sides = "t", alpha = 0.2)
 
+x<-fig.data %>% 
+  group_by(BeachID) %>% 
+  summarize(meanIntensity = mean(peopleIntensity), developedLand = mean(developedLand), region = Region)
+
+ggplot(fig.data, aes(developedLand, peopleIntensity, color = County)) + geom_point()
+ggplot(x, aes(developedLand, meanIntensity, color = region)) + geom_point() + geom_smooth(method = "lm")
 ```
 
-## Figures
-
-```{r tables}
-beachTable<-data.frame(mod_phys$BeachID) %>% 
-  rename(Beach = mod_phys.BeachID)
-beachTable$SpatialModel<-"x"
-beachTable$TemporalModel<-ifelse(beachTable$Beach %in% mod_human$BeachID, "x", "")
-beachTable$Region<-mod_phys$Region
-beachTable<-left_join(beachTable, mod_human[,c(1,23)], by = c("Beach"="BeachID")) %>% 
-  unique() %>% 
-  mutate(County = replace(County, Beach == "James", "Pictou")) %>% 
-  mutate(County = replace(County, Beach == "Bowen Island", "Pictou")) %>% 
-  mutate(County = replace(County, Beach == "Stoney (Lawrencetown Head)", "Halifax")) %>% 
-  mutate(County = replace(County, Beach == "Cranberry Pond", "Queens")) %>% 
-  mutate(County = replace(County, Beach == "Harbour Breeze, Port Joli", "Shelburne")) %>%
-  mutate(County = replace(County, Beach == "Dominion (Lingan)", "Cape Breton")) %>% 
-  mutate(County = replace(County, Beach == "Ogdens Pond", "Antigonish")) %>% 
-  filter(!is.na(County)) %>% 
-  arrange(Region, County) %>% 
-  select(Region:County, Beach, SpatialModel, TemporalModel)
-
-write.table(beachTable)
-
-sjPlot::tab_model(mp2, m2, show.aic = TRUE)
-
-sjPlot::tab_model(mb1, mf1, show.aic = TRUE)
-```
-
-
-```{r phys mods eff size}
-sjPlot::plot_model(m2, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
-sjPlot::plot_model(mp2, show.values = TRUE, value.offset = .3)
-
-```
-
-
-```{r human mods eff size}
-sjPlot::plot_model(mf1, show.values = TRUE, value.offset = .3, ylim = c(0.1,1000))
-sjPlot::plot_model(mb1, show.values = TRUE, value.offset = .3)
-
-mf1_eff<-get_model_data(mf1, type = "est")
-mb1_eff<-get_model_data(mb1, type = "est")
-#save and join together in word?
-sjPlot::tab_model(mf1)
-sjPlot::tab_model(mb1)
-
-f<-ggplot(mf1_eff, aes(estimate, term, color = group)) + geom_vline(aes(xintercept = 1),color = "gray") + geom_point()
-
-f + geom_errorbar(aes(xmin=conf.low, xmax=conf.high), width=.08,position=position_dodge(.9)) + scale_x_continuous(limits = c(.01,100),trans = "log10", breaks = c(0.01,0.1,1,10,100), labels = c(0.01,0.1,1,10,100))  + scale_y_discrete(labels = c("Fenced Nests", "Mean Unleashed Dogs", "Visitor Intensity", "Mean Total Dogs", "Large Signs","Small Signs"))+ labs(x = "Odds Ratio", y = "Model Term") + geom_text(aes(label = p.label), vjust = -1) + theme(legend.position="none")
-
-b<-ggplot(mb1_eff, aes(estimate, term, color = group)) + geom_vline(aes(xintercept = 1),color = "gray") + geom_point()
-
-b + geom_errorbar(aes(xmin=conf.low, xmax=conf.high), width=.08,position=position_dodge(.9)) + scale_x_continuous(limits = c(.1,1000000),trans = "log10", breaks = c(0.01,0.1,1,10,100,1000,10000,100000,1000000), labels = c(0.01,0.1,1,10,100,1000,10000,100000,1000000))  + scale_y_discrete(labels = c("Fenced Nests", "Mean Unleashed Dogs", "Visitor Intensity", "Mean Total Dogs", "Large Signs","Small Signs"))+ labs(x = "Odds Ratio", y = "Model Term") + geom_text(aes(label = p.label), vjust = -1) + theme(legend.position="none")
-
-```
-```{r for Mapping}
+reformatting data to add location data to productivity data so I can potentially map some of this data in QGIS
+```{r for Mapping, eval = FALSE}
 centroids<-read.csv(file = '../Data/map.info.csv') %>% 
   select(Name,BeachArea, xcoord:ycoord) %>% 
   rename(BeachID = Name)
@@ -319,6 +325,7 @@ centroids<-read.csv(file = '../Data/map.info.csv') %>%
 y<-centroids 
 x<-mod_phys
 
+#Make the location data have correct names
 x<-stringdist_join(x, y, 
                 by = "BeachID",
                 mode = "left",
@@ -343,106 +350,6 @@ map_df<-full_join(centroids, x, by = c("BeachID" = "correction")) %>%
   select(-dist) %>% 
   left_join(mod_phys)
 #write.csv( map_df, file = '../Data/map_phys_data.csv')
-```
-
-
-
-## old model code
-
-```{r fixing singularity old}
-library("numDeriv")
-library("reshape2")
-library("afex")
-
-mod<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + offleash_ind + County + fencedNests + (1|BeachID), data = mod_humanSc, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-summary(mod)
-
-tt <- getME(mod,"theta")
-ll <- getME(mod,"lower")
-min(tt[ll==0]) #def singular
-
-#checking gradient calculations
-derivs1 <- mod_sc@optinfo$derivs
-sc_grad1 <- with(derivs1,solve(Hessian,gradient))
-max(abs(sc_grad1))
-
-max(pmin(abs(sc_grad1),abs(derivs1$gradient))) #below the tolerance of .001 so this is good!
-
-#more iterations?
-ss <- getME(mod_sc,c("theta","fixef"))
-mod2 <- update(mod_sc,start=ss,control=glmerControl(optCtrl=list(maxfun=2e4))) #still singular
-
-
-```
-
-
-```{r random factor selection old}
-#rescale numerical variables
-numcols<-which(sapply(mod_human[,1:23], is.numeric)) #don't rescale response variables for the poisson distribution (no negatives)
-mod_humanSc<-mod_human
-mod_humanSc[,numcols] <- scale(mod_humanSc[,numcols])
-
-mean(mod.data$YE_pairs) #0.853
-var(mod.data$YE_pairs) #1.799
-
-mod.data<-mod_humanSc %>% 
-  select(BeachID:Year, signs_small:vehicles, dogs_unleashedTotal:dogs_all, peopleIntensity, County) %>% 
-  na.omit()
-#with scaled variables
-#assess random factor structure first
-mh1<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|Year) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#no error
-
-mh2<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + Year + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#no error
-
-mh3<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|Year) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-#no error
-
-mh4<-glmer(YE_pairs ~ signs_small + signs_large + vehicles + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-# no error
-
-#compare AIC values to pick random structure?
-summary(mh1) #637.9
-summary(mh2) #633.9
-summary(mh3) #631.2
-summary(mh4) #629.2 #best value
-
-```
-
-
-```{r fixed factor selection old}
-drop1(mh4, test = "Chi")
-
-mh5<-glmer(YE_pairs ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-drop1(mh5, test = "Chi")
-
-mh6<-glmer(YE_pairs ~ signs_small + signs_large + dogs_all + peopleIntensity +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-drop1(mh6, test = "Chi")
-
-mh7<-glmer(YE_pairs ~ signs_small + signs_large + peopleIntensity +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = poisson(link = "log"), control = glmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
-drop1(mh7, test = "Chi")
-
-summary(mh7)
-
-
-```
-
-
-```{r model validations old}
-simOutput <- simulateResiduals(fittedModel = mh7, plot = T) #bad for uniformity and quantiles
-
-testDispersion(mh7, type = "PearsonChisq") #not okay
-testZeroInflation(mh4) #okay
-
-#for the variables
-plotResiduals(simOutput, form = mod.data$signs_small)
-plotResiduals(simOutput, form = mod.data$signs_large)
-plotResiduals(simOutput, form = mod.data$peopleIntensity)
-plotResiduals(simOutput, form = mod.data$fencedNests)
-plotResiduals(simOutput, form = mod.data$BeachID) #n.s. okay
-plotResiduals(simOutput, form = mod.data$County) #also okay n.s. only a few groups non-uniform
-
 ```
 
 ## End
