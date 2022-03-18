@@ -18,26 +18,6 @@ mod_phys<-read.csv(file = '../Data/spatialMod.csv') %>%
   select(-1)
 ```
 
-## Stats Plan Ideas/Notes
-
-Model with all beaches data (CWS prod data and physical data)
--maybe use a category of always has pipls, never has pipls, sometimes has pipls
-- prod_var ~ Length_km + beachArea + urban_percent + agr_percent + road_percent + beach_forage + *beach width(?)* + (1|Year) + (1|BeachID) ?????
-- this model would cover physical characteristics only
-- look into how we can do effect size, could drop factors and look at variation explained and it's change (sensu Sarah paper)
-- serious con of not being able to compare effect size of diff types within a model
-- probably over-paramaterized
-
-Human survey data
-- could model based on categorical productivity variable to assess what's important
-- could just summarize and put into a more generic model (base off BRC)
-- If I model this it could help direct the BRC, what should we rate
-- nested model BeachID/Year, can have specific human summary variables per beach per year
-
-Overall model
-- Should I try to do one big model??
-- split into types of factors? human, physical, environmental? One model each?
-
 
 
 ## Models
@@ -263,57 +243,6 @@ sjPlot::plot_model(mb2, show.values = TRUE, value.offset = .3)
 plot_models(mf2, mb2, m.labels = c("Productivity", "Breeding Pairs"), show.p = TRUE, p.shape = FALSE, show.values = TRUE, spacing = .7, dot.size = 1.2, value.size = 4.5, axis.labels = c("Fenced Nests","Mean Unleashed Dogs","Visitor Intensity","Vehicles","Mean Total Dogs","Large Signs","Small Signs"))
 ```
 
-
-```{r human mods figs}
-#messing around
-fig.data<-mod_human %>% 
-  mutate(fledglingSuccess = ifelse(Productivity >1.65, 1, 0)) %>% 
-  mutate(fencePres = ifelse(fencedNests >0, "Yes", "No")) %>% 
-  na.omit()
-fig.data<-left_join(fig.data, mod_phys[,c(1:4, 7, 9, 25,27)], by = "BeachID")
-fig.data$pred.fledg <- predict(mf1, newdata=fig.data, type="response")
-
-
-ggplot(fig.data, aes(signs_large, YE_pairs, color = as.factor(fledglingSuccess), group = fledglingSuccess))+geom_point() + geom_smooth(method = "lm")
-
-ggplot(fig.data, aes(signs_large, fencedNests, color = as.factor(fledglingSuccess), group = fledglingSuccess))+geom_point() + geom_smooth(method = "lm")
-
-### this plot has potential, shows a difference in signs present at unsuccessful sites
-ggplot(fig.data, aes(signs_large, pred.fledg, group = fencePres, color = fencePres))+ geom_point() + geom_smooth(method = "lm")
-
-#looked at the effect by region and it was nothing important
-ggplot(fig.data, aes(signs_large, fledglingSuccess)) + geom_point(alpha=.5) +
-  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial))
-
-ggplot(fig.data, aes(fencedNests, fledglingSuccess)) + geom_point(alpha=.5) +
-  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial)) 
-
-#rug plots are underwhelming
-fig.data<-fig.data %>% 
-  mutate(goodFledg = ifelse(fledglingSuccess == 1, fencedNests, NA),
-         badFledg  = ifelse(fledglingSuccess == 0, fencedNests, NA)) %>% 
-  mutate(goodFledgSign = ifelse(fledglingSuccess == 1, signs_large, NA),
-         badFledgSign  = ifelse(fledglingSuccess == 0, signs_large, NA))
-
-ggplot(fig.data, aes(x = fencedNests, y = fledglingSuccess)) +
-  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial)) +
-  labs(x = "fencedNests", y = "Fledgling Goal") +
-  geom_rug(aes(x = badFledg), sides = "b", alpha = 0.2) +
-  geom_rug(aes(x = goodFledg), sides = "t", alpha = 0.2)
-
-ggplot(fig.data, aes(x = signs_large, y = fledglingSuccess)) +
-  stat_smooth(method="glm", se=TRUE, method.args = list(family=binomial)) +
-  labs(x = "fencedNests", y = "Fledgling Goal") +
-  geom_rug(aes(x = badFledgSign), sides = "b", alpha = 0.2) +
-  geom_rug(aes(x = goodFledgSign), sides = "t", alpha = 0.2)
-
-x<-fig.data %>% 
-  group_by(BeachID) %>% 
-  summarize(meanIntensity = mean(peopleIntensity), developedLand = mean(developedLand), region = Region)
-
-ggplot(fig.data, aes(developedLand, peopleIntensity, color = County)) + geom_point()
-ggplot(x, aes(developedLand, meanIntensity, color = region)) + geom_point() + geom_smooth(method = "lm")
-```
 
 reformatting data to add location data to productivity data so I can potentially map some of this data in QGIS
 ```{r for Mapping, eval = FALSE}
