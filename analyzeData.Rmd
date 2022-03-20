@@ -127,12 +127,6 @@ mod.data<-mod_human %>%
   select(BeachID:Year, signs_small:vehicles, dogs_unleashedTotal:dogs_all, peopleIntensity, County, breedingSuccess) %>% 
   na.omit()
 
-mb1<-glmer(breedingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + dogs_unleashedTotal + vehicles + fencedNests + (1|County) + (1|BeachID), data = mod.data, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-#allFit(mb1) #bobyqa
-
-summary(mb1) #AIC 216.2
-
-# the significance is not different and this creates minor (n.s.) issues with the residuals in validation
 mb2<-glmer(breedingSuccess ~ signs_small + signs_large + dogs_all + peopleIntensity + vehicles + dogs_unleashedTotal +  fencedNests + (1|County) + (1|BeachID), data = mod.data, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 
 summary(mb2) #AIC = 216.7
@@ -241,6 +235,8 @@ sjPlot::plot_model(mb2, show.values = TRUE, value.offset = .3)
 #do this for both, was going to do in ggplot but conversion of eff size for the other models would be a pain 
 #(saved 7x8 landscape)
 plot_models(mf2, mb2, m.labels = c("Productivity", "Breeding Pairs"), show.p = TRUE, p.shape = FALSE, show.values = TRUE, spacing = .7, dot.size = 1.2, value.size = 4.5, axis.labels = c("Fenced Nests","Mean Unleashed Dogs","Visitor Intensity","Vehicles","Mean Total Dogs","Large Signs","Small Signs"))
+
+ggplot(mod_human, aes(fencedNests, signs_small)) + geom_point(aes(color = as.factor(breedingSuccess))) + geom_smooth(method = "lm", color = "black") + scale_color_discrete(name = "Breeding Pairs", labels = c("<1", ">1", "NA"))
 ```
 
 
