@@ -22,7 +22,7 @@ These Beaches are mentioned in spreadsheets but will be excluded since they're n
 "Margaree Harbour", "MacKay's Point", "Port Mouton Island", "Jimtown", "Linwood", "South Lakevale (Cribbons)", "Tracadie Big Island / Delorey", "Tracadie West Arm", "Ratcliffe Hills (The Cape)"
 
 
-Here I load in all the dfs that will be used and cleaned.
+Here I load in all the dfs that will be used and cleaned
 ```{r load data}
 #function to remove columns that are all NA
 all_na <- function(x) any(!is.na(x)) 
